@@ -1,0 +1,16 @@
+{
+  "name": "99chat",
+  "short_name": "Chat",
+  "description": "Let's talk. — 轻量级即时通讯 PWA",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#1890ff",
+  "lang": "zh-CN",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

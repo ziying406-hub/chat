@@ -17,7 +17,7 @@ import {
   type FriendApplicationItem,
   type SelfUserInfo,
 } from "../services/openim";
-import { SessionType, MessageType, GroupMemberRole } from "@openim/wasm-client-sdk";
+import { SessionType, MessageType } from "@openim/wasm-client-sdk";
 
 interface AuthData {
   imToken: string;
@@ -34,25 +34,29 @@ interface AppState {
 
   conversations: ConversationItem[];
   activeConversationID: string | null;
+  activeConversationType: SessionType | null;
   messagesMap: Record<string, MessageItem[]>;
   friends: FriendUserItem[];
   groups: GroupItem[];
   groupMembersMap: Record<string, GroupMemberItem[]>;
   friendRequests: FriendApplicationItem[];
+  groupRequests: any[];
   totalUnread: number;
 
-  // Auth actions
+  // Auth
   sendCode: (phone: string, areaCode?: string) => Promise<void>;
   register: (params: { phoneNumber: string; verifyCode: string; nickname: string; password: string; areaCode?: string }) => Promise<void>;
   login: (params: { phoneNumber: string; password: string; areaCode?: string }) => Promise<void>;
   logout: () => Promise<void>;
   setAuthError: (err: string | null) => void;
 
-  // Data actions
+  // Data
   loadAllData: () => Promise<void>;
   setActiveConversation: (id: string | null) => void;
   loadMessages: (conversationID: string) => Promise<void>;
   sendTextMessage: (conversationID: string, text: string) => Promise<void>;
+  sendImageMessage: (conversationID: string, file: File) => Promise<void>;
+  sendSoundMessage: (conversationID: string, file: File, duration: number) => Promise<void>;
   markRead: (conversationID: string) => Promise<void>;
   pinConversation: (conversationID: string, isPinned: boolean) => Promise<void>;
   muteConversation: (conversationID: string, opt: number) => Promise<void>;
@@ -68,6 +72,19 @@ interface AppState {
   // Groups
   createGroup: (name: string, memberUserIDs: string[]) => Promise<void>;
   loadGroupMembers: (groupID: string) => Promise<void>;
+  setGroupInfo: (groupID: string, info: Partial<GroupItem>) => Promise<void>;
+  inviteToGroup: (groupID: string, userIDs: string[], reason: string) => Promise<void>;
+  kickFromGroup: (groupID: string, userIDs: string[], reason: string) => Promise<void>;
+  muteGroupMember: (groupID: string, userID: string, seconds: number) => Promise<void>;
+  dismissGroup: (groupID: string) => Promise<void>;
+  transferGroupOwner: (groupID: string, newOwnerUserID: string) => Promise<void>;
+  loadGroupApplications: () => Promise<void>;
+  acceptGroupApplication: (groupID: string, fromUserID: string) => Promise<void>;
+  refuseGroupApplication: (groupID: string, fromUserID: string) => Promise<void>;
+
+  // Profile
+  updateSelfInfo: (info: { nickname?: string; faceURL?: string; ex?: string }) => Promise<void>;
+  uploadAvatar: (file: File) => Promise<string | null>;
 }
 
 export const useAppStore = create<AppState>()(
@@ -79,11 +96,13 @@ export const useAppStore = create<AppState>()(
     authData: null,
     conversations: [],
     activeConversationID: null,
+    activeConversationType: null,
     messagesMap: {},
     friends: [],
     groups: [],
     groupMembersMap: {},
     friendRequests: [],
+    groupRequests: [],
     totalUnread: 0,
 
     sendCode: async (phone, areaCode = "+86") => {
@@ -136,6 +155,7 @@ export const useAppStore = create<AppState>()(
         s.groups = [];
         s.groupMembersMap = {};
         s.friendRequests = [];
+        s.groupRequests = [];
         s.activeConversationID = null;
       });
     },
@@ -173,81 +193,70 @@ export const useAppStore = create<AppState>()(
         set((s) => { s.friendRequests = reqRes.data || []; });
       } catch {}
 
-      // Register event listeners
-      const unsubscribers = [
-        on(CbEvents.OnConversationChanged, (convs: ConversationItem[]) => {
-          set((s) => {
-            for (const conv of convs) {
-              const idx = s.conversations.findIndex((c) => c.conversationID === conv.conversationID);
-              if (idx >= 0) s.conversations[idx] = conv;
-              else s.conversations.push(conv);
+      try {
+        const groupReqRes = await im.getGroupApplicationListAsRecipient();
+        set((s) => { s.groupRequests = groupReqRes.data || []; });
+      } catch {}
+
+      on(CbEvents.OnConversationChanged, (convs: ConversationItem[]) => {
+        set((s) => {
+          for (const conv of convs) {
+            const idx = s.conversations.findIndex((c) => c.conversationID === conv.conversationID);
+            if (idx >= 0) s.conversations[idx] = conv;
+            else s.conversations.push(conv);
+          }
+        });
+      });
+      on(CbEvents.OnNewConversation, (convs: ConversationItem[]) => {
+        set((s) => {
+          for (const conv of convs) {
+            if (!s.conversations.find((c) => c.conversationID === conv.conversationID)) {
+              s.conversations.push(conv);
             }
-          });
-        }),
-        on(CbEvents.OnNewConversation, (convs: ConversationItem[]) => {
-          set((s) => {
-            for (const conv of convs) {
-              if (!s.conversations.find((c) => c.conversationID === conv.conversationID)) {
-                s.conversations.push(conv);
-              }
-            }
-          });
-        }),
-        on(CbEvents.OnRecvNewMessage, (msg: MessageItem) => {
-          set((s) => {
-            const cid = msg.conversationID;
-            if (!s.messagesMap[cid]) s.messagesMap[cid] = [];
-            if (!s.messagesMap[cid].find((m) => m.clientMsgID === msg.clientMsgID)) {
-              s.messagesMap[cid].push(msg);
-            }
-            // Update unread
-            const conv = s.conversations.find((c) => c.conversationID === cid);
-            if (conv && cid !== s.activeConversationID) conv.unreadCount++;
-          });
-        }),
-        on(CbEvents.OnTotalUnreadMessageCountChanged, (data: { totalUnreadCount: number }) => {
-          set((s) => { s.totalUnread = data?.totalUnreadCount ?? 0; });
-        }),
-        on(CbEvents.OnFriendAdded, (friend: FriendUserItem) => {
-          set((s) => { if (!s.friends.find((f) => f.userID === friend.userID)) s.friends.push(friend); });
-        }),
-        on(CbEvents.OnFriendApplicationAccepted, () => {
-          // Reload friend requests
-          im.getFriendApplicationListAsRecipient().then((res) => {
-            set((s) => { s.friendRequests = res.data || []; });
-          });
-        }),
-        on(CbEvents.OnSyncServerFinish, () => {
-          get().loadAllData();
-        }),
-      ];
-      // Store unsubscribers on window for cleanup
-      (window as any).__openimUnsubscribers = unsubscribers;
+          }
+        });
+      });
+      on(CbEvents.OnRecvNewMessage, (msg: MessageItem) => {
+        set((s) => {
+          const cid = (msg as any).conversationID;
+          if (!s.messagesMap[cid]) s.messagesMap[cid] = [];
+          if (!s.messagesMap[cid].find((m) => m.clientMsgID === msg.clientMsgID)) {
+            s.messagesMap[cid].push(msg);
+          }
+          const conv = s.conversations.find((c) => c.conversationID === cid);
+          if (conv && cid !== s.activeConversationID) conv.unreadCount++;
+        });
+      });
+      on(CbEvents.OnTotalUnreadMessageCountChanged, (data: any) => {
+        set((s) => { s.totalUnread = data?.totalUnreadCount ?? 0; });
+      });
+      on(CbEvents.OnFriendAdded, (friend: FriendUserItem) => {
+        set((s) => { if (!s.friends.find((f) => f.userID === friend.userID)) s.friends.push(friend); });
+      });
+      on(CbEvents.OnFriendApplicationAccepted, () => {
+        im.getFriendApplicationListAsRecipient().then((res) => { set((s) => { s.friendRequests = res.data || []; }); });
+        im.getFriendList().then((res) => { set((s) => { s.friends = res.data || []; }); });
+      });
+      on(CbEvents.OnSyncServerFinish, () => { get().loadAllData(); });
     },
 
     setActiveConversation: (id) => set((s) => {
       s.activeConversationID = id;
       if (id) {
         const conv = s.conversations.find((c) => c.conversationID === id);
-        if (conv) conv.unreadCount = 0;
+        if (conv) {
+          conv.unreadCount = 0;
+          s.activeConversationType = conv.conversationType;
+        }
       }
     }),
 
     loadMessages: async (conversationID) => {
       const im = getIMSDK();
       try {
-        const res = await im.getAdvancedHistoryMessageList({
-          conversationID,
-          startClientMsgID: "",
-          count: 50,
-          lastMinSeq: 0,
-        });
-        set((s) => {
-          s.messagesMap[conversationID] = (res.data?.messageList || []).reverse();
-        });
-      } catch (e) {
-        console.error("loadMessages error:", e);
-      }
+        const res = await im.getAdvancedHistoryMessageList({ conversationID, startClientMsgID: "", count: 50, lastMinSeq: 0 });
+        set((s) => { s.messagesMap[conversationID] = (res.data?.messageList || []).reverse(); });
+      } catch (e) { console.error("loadMessages:", e); }
     },
 
     sendTextMessage: async (conversationID, text) => {
@@ -255,23 +264,15 @@ export const useAppStore = create<AppState>()(
       const state = get();
       const conv = state.conversations.find((c) => c.conversationID === conversationID);
       if (!conv) return;
-
       const msgRes = await im.createTextMessage(text);
       const message = msgRes.data;
       if (!message) return;
-
       const params: any = {
         recvID: conv.conversationType === SessionType.Single ? conv.userID : "",
         groupID: conv.conversationType === SessionType.Group ? conv.groupID : "",
         message,
       };
-
-      // Optimistic add
-      set((s) => {
-        if (!s.messagesMap[conversationID]) s.messagesMap[conversationID] = [];
-        s.messagesMap[conversationID].push(message);
-      });
-
+      set((s) => { if (!s.messagesMap[conversationID]) s.messagesMap[conversationID] = []; s.messagesMap[conversationID].push(message); });
       try {
         const sendRes = await im.sendMessage(params);
         if (sendRes.data) {
@@ -288,47 +289,97 @@ export const useAppStore = create<AppState>()(
           const msgs = s.messagesMap[conversationID];
           if (msgs) {
             const idx = msgs.findIndex((m) => m.clientMsgID === message.clientMsgID);
-            if (idx >= 0) (msgs[idx] as any).status = 3; // Failed
+            if (idx >= 0) (msgs[idx] as any).status = 3;
           }
         });
       }
+    },
+
+    sendImageMessage: async (conversationID, file) => {
+      const im = getIMSDK();
+      const state = get();
+      const conv = state.conversations.find((c) => c.conversationID === conversationID);
+      if (!conv) return;
+      try {
+        const msgRes = await im.createImageMessageByFile({
+          sourcePath: URL.createObjectURL(file),
+          sourcePicture: { uuid: "", type: file.type, size: file.size, width: 0, height: 0, url: "" },
+          bigPicture: { uuid: "", type: file.type, size: file.size, width: 0, height: 0, url: "" },
+          snapshotPicture: { uuid: "", type: file.type, size: file.size, width: 0, height: 0, url: "" },
+          file,
+        } as any);
+        const message = msgRes.data;
+        if (!message) return;
+        set((s) => { if (!s.messagesMap[conversationID]) s.messagesMap[conversationID] = []; s.messagesMap[conversationID].push(message); });
+        const params: any = {
+          recvID: conv.conversationType === SessionType.Single ? conv.userID : "",
+          groupID: conv.conversationType === SessionType.Group ? conv.groupID : "",
+          message,
+        };
+        const sendRes = await im.sendMessage(params);
+        if (sendRes.data) {
+          set((s) => {
+            const msgs = s.messagesMap[conversationID];
+            if (msgs) {
+              const idx = msgs.findIndex((m) => m.clientMsgID === message.clientMsgID);
+              if (idx >= 0) msgs[idx] = sendRes.data!;
+            }
+          });
+        }
+      } catch (e) { console.error("sendImage:", e); }
+    },
+
+    sendSoundMessage: async (conversationID, file, duration) => {
+      const im = getIMSDK();
+      const state = get();
+      const conv = state.conversations.find((c) => c.conversationID === conversationID);
+      if (!conv) return;
+      try {
+        const msgRes = await im.createSoundMessageByFile({
+          uuid: "",
+          soundPath: URL.createObjectURL(file),
+          sourceUrl: "",
+          dataSize: file.size,
+          duration,
+          file,
+        } as any);
+        const message = msgRes.data;
+        if (!message) return;
+        set((s) => { if (!s.messagesMap[conversationID]) s.messagesMap[conversationID] = []; s.messagesMap[conversationID].push(message); });
+        const params: any = {
+          recvID: conv.conversationType === SessionType.Single ? conv.userID : "",
+          groupID: conv.conversationType === SessionType.Group ? conv.groupID : "",
+          message,
+        };
+        const sendRes = await im.sendMessage(params);
+        if (sendRes.data) {
+          set((s) => {
+            const msgs = s.messagesMap[conversationID];
+            if (msgs) {
+              const idx = msgs.findIndex((m) => m.clientMsgID === message.clientMsgID);
+              if (idx >= 0) msgs[idx] = sendRes.data!;
+            }
+          });
+        }
+      } catch (e) { console.error("sendSound:", e); }
     },
 
     markRead: async (conversationID) => {
       const im = getIMSDK();
       try {
         await im.markConversationMessageAsRead(conversationID);
-        set((s) => {
-          const conv = s.conversations.find((c) => c.conversationID === conversationID);
-          if (conv) conv.unreadCount = 0;
-        });
-      } catch (e) {
-        console.error("markRead error:", e);
-      }
+        set((s) => { const conv = s.conversations.find((c) => c.conversationID === conversationID); if (conv) conv.unreadCount = 0; });
+      } catch (e) { console.error("markRead:", e); }
     },
 
     pinConversation: async (conversationID, isPinned) => {
       const im = getIMSDK();
-      try {
-        await im.setConversation({
-          conversationID,
-          isPinned,
-        });
-      } catch (e) {
-        console.error("pin error:", e);
-      }
+      try { await im.setConversation({ conversationID, isPinned }); } catch (e) { console.error("pin:", e); }
     },
 
     muteConversation: async (conversationID, opt) => {
       const im = getIMSDK();
-      try {
-        await im.setConversation({
-          conversationID,
-          recvMsgOpt: opt,
-        });
-      } catch (e) {
-        console.error("mute error:", e);
-      }
+      try { await im.setConversation({ conversationID, recvMsgOpt: opt }); } catch (e) { console.error("mute:", e); }
     },
 
     deleteConversation: async (conversationID) => {
@@ -340,9 +391,7 @@ export const useAppStore = create<AppState>()(
           delete s.messagesMap[conversationID];
           if (s.activeConversationID === conversationID) s.activeConversationID = null;
         });
-      } catch (e) {
-        console.error("deleteConversation error:", e);
-      }
+      } catch (e) { console.error("deleteConv:", e); }
     },
 
     revokeMessage: async (conversationID, clientMsgID) => {
@@ -353,21 +402,13 @@ export const useAppStore = create<AppState>()(
           const msgs = s.messagesMap[conversationID];
           if (msgs) {
             const idx = msgs.findIndex((m) => m.clientMsgID === clientMsgID);
-            if (idx >= 0) {
-              (msgs[idx] as any).contentType = MessageType.NotificationMessage;
-            }
+            if (idx >= 0) (msgs[idx] as any).contentType = MessageType.NotificationMessage;
           }
         });
-      } catch (e) {
-        console.error("revoke error:", e);
-      }
+      } catch (e) { console.error("revoke:", e); }
     },
 
-    addFriend: async (userID, reqMsg) => {
-      const im = getIMSDK();
-      await im.addFriend({ toUserID: userID, reqMsg });
-    },
-
+    addFriend: async (userID, reqMsg) => { const im = getIMSDK(); await im.addFriend({ toUserID: userID, reqMsg }); },
     acceptFriendRequest: async (userID) => {
       const im = getIMSDK();
       await im.acceptFriendApplication({ toUserID: userID, handleMsg: "同意" });
@@ -376,14 +417,12 @@ export const useAppStore = create<AppState>()(
       const frRes = await im.getFriendList();
       set((s) => { s.friends = frRes.data || []; });
     },
-
     rejectFriendRequest: async (userID) => {
       const im = getIMSDK();
       await im.refuseFriendApplication({ toUserID: userID, handleMsg: "拒绝" });
       const res = await im.getFriendApplicationListAsRecipient();
       set((s) => { s.friendRequests = res.data || []; });
     },
-
     deleteFriend: async (userID) => {
       const im = getIMSDK();
       await im.deleteFriend(userID);
@@ -392,24 +431,100 @@ export const useAppStore = create<AppState>()(
 
     createGroup: async (name, memberUserIDs) => {
       const im = getIMSDK();
-      const res = await im.createGroup({
-        memberUserIDs,
-        groupInfo: { groupName: name },
-      });
+      const res = await im.createGroup({ memberUserIDs, groupInfo: { groupName: name } });
       if (res.data) {
         const groupRes = await im.getJoinedGroupList();
         set((s) => { s.groups = groupRes.data || []; });
       }
-      return res.data;
     },
 
     loadGroupMembers: async (groupID) => {
       const im = getIMSDK();
       try {
-        const res = await im.getGroupMemberList({ groupID, pagination: { pageNumber: 1, showNumber: 100 } });
+        const res = await im.getGroupMemberList({ groupID, offset: 0, count: 1000 } as any);
         set((s) => { s.groupMembersMap[groupID] = res.data || []; });
+      } catch (e) { console.error("loadGroupMembers:", e); }
+    },
+
+    setGroupInfo: async (groupID, info) => {
+      const im = getIMSDK();
+      try {
+        await im.setGroupInfo({ groupID, ...info } as any);
+        const groupRes = await im.getJoinedGroupList();
+        set((s) => { s.groups = groupRes.data || []; });
+      } catch (e) { console.error("setGroupInfo:", e); }
+    },
+
+    inviteToGroup: async (groupID, userIDs, reason) => {
+      const im = getIMSDK();
+      try { await im.inviteUserToGroup({ groupID, userIDList: userIDs, reason } as any); } catch (e) { console.error("inviteToGroup:", e); }
+    },
+
+    kickFromGroup: async (groupID, userIDs, reason) => {
+      const im = getIMSDK();
+      try { await im.kickGroupMember({ groupID, userIDList: userIDs, reason } as any); } catch (e) { console.error("kickFromGroup:", e); }
+    },
+
+    muteGroupMember: async (groupID, userID, seconds) => {
+      const im = getIMSDK();
+      try { await im.changeGroupMemberMute({ groupID, userID, mutedSeconds: seconds }); } catch (e) { console.error("muteGroupMember:", e); }
+    },
+
+    dismissGroup: async (groupID) => {
+      const im = getIMSDK();
+      try {
+        await im.dismissGroup(groupID);
+        set((s) => { s.groups = s.groups.filter((g) => g.groupID !== groupID); });
+      } catch (e) { console.error("dismissGroup:", e); }
+    },
+
+    transferGroupOwner: async (groupID, newOwnerUserID) => {
+      const im = getIMSDK();
+      try { await im.transferGroupOwner({ groupID, newOwnerUserID } as any); } catch (e) { console.error("transferGroup:", e); }
+    },
+
+    loadGroupApplications: async () => {
+      const im = getIMSDK();
+      try {
+        const res = await im.getGroupApplicationListAsRecipient();
+        set((s) => { s.groupRequests = res.data || []; });
+      } catch (e) { console.error("loadGroupApps:", e); }
+    },
+
+    acceptGroupApplication: async (groupID, fromUserID) => {
+      const im = getIMSDK();
+      try {
+        await im.acceptGroupApplication({ groupID, fromUserID, handleMsg: "同意" } as any);
+        await get().loadGroupApplications();
+      } catch (e) { console.error("acceptGroupApp:", e); }
+    },
+
+    refuseGroupApplication: async (groupID, fromUserID) => {
+      const im = getIMSDK();
+      try {
+        await im.refuseGroupApplication({ groupID, fromUserID, handleMsg: "拒绝" } as any);
+        await get().loadGroupApplications();
+      } catch (e) { console.error("refuseGroupApp:", e); }
+    },
+
+    updateSelfInfo: async (info) => {
+      const im = getIMSDK();
+      try {
+        await im.setSelfInfo(info);
+        const res = await im.getSelfUserInfo();
+        set((s) => { s.currentUser = res.data; });
+      } catch (e) { console.error("updateSelfInfo:", e); }
+    },
+
+    uploadAvatar: async (file) => {
+      const im = getIMSDK();
+      try {
+        const uuid = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const res = await im.uploadFile({ name: file.name, contentType: file.type, uuid, file } as any);
+        return res.data?.url || null;
       } catch (e) {
-        console.error("loadGroupMembers error:", e);
+        console.error("uploadAvatar:", e);
+        return null;
       }
     },
   }))

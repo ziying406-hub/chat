@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useEffect } from "react";
-import { ArrowLeft, Users, Volume2, LogOut, Crown, Shield, QrCode } from "lucide-react";
+import { ArrowLeft, Users, Volume2, LogOut, Crown, Shield, QrCode, Settings as SettingsIcon } from "lucide-react";
 import { useAppStore } from "../../store/app-store";
 import { GroupMemberRole } from "@openim/wasm-client-sdk";
 import { useState } from "react";
@@ -75,6 +75,7 @@ export default function GroupDetail() {
         </div>
 
         <div className="mt-2 bg-white border-y border-gray-50">
+          <button onClick={() => navigate(`/messages/groups/admin/${group.groupID}`)} className="w-full px-6 py-3.5 text-left text-sm text-gray-500 hover:text-gray-700 flex items-center gap-2"><SettingsIcon size={16} /> 群管理</button>
           <button className="w-full px-6 py-3.5 text-left text-sm text-gray-500 hover:text-gray-700 flex items-center gap-2"><Volume2 size={16} /> 消息免打扰</button>
           {group.ownerUserID === currentUser?.userID ? (
             <button className="w-full px-6 py-3.5 text-left text-sm text-red-400 hover:text-red-500 flex items-center gap-2"><LogOut size={16} /> 解散群组</button>

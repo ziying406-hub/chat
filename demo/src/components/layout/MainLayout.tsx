@@ -9,6 +9,7 @@ import GroupList from "../contact/GroupList";
 import GroupDetail from "../contact/GroupDetail";
 import FriendRequests from "../contact/FriendRequests";
 import CreateGroup from "../contact/CreateGroup";
+import GroupAdmin from "../group/GroupAdmin";
 import Settings from "../settings/Settings";
 import ProfileEdit from "../settings/ProfileEdit";
 import GeneralSettings from "../settings/GeneralSettings";
@@ -61,6 +62,7 @@ export default function MainLayout() {
         <Route path="/messages" element={<ConversationList />}>
           <Route index element={<EmptyState />} />
           <Route path="session/:id" element={<ChatView />} />
+          <Route path="groups/admin/:id" element={<GroupAdmin />} />
         </Route>
         <Route path="/contact" element={<ContactList />}>
           <Route index element={<div className="flex-1 flex items-center justify-center text-gray-300 text-sm">选择一个联系人</div>} />
