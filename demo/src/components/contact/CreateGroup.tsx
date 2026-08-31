@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Check } from "lucide-react";
+import { ArrowLeft, Check, Users } from "lucide-react";
 import { useAppStore } from "../../store/app-store";
 
 export default function CreateGroup() {
@@ -45,6 +45,13 @@ export default function CreateGroup() {
       </div>
 
       <div className="flex-1 overflow-y-auto bg-white">
+        {friends.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-20 text-gray-300 text-sm gap-3">
+            <Users size={28} className="opacity-30" />
+            <span>暂无好友，无法创建群聊</span>
+            <button onClick={() => navigate("/contact/requests")} className="text-primary-500 hover:underline text-sm">添加好友</button>
+          </div>
+        )}
         {friends.map((f) => (
           <button key={f.userID} onClick={() => toggle(f.userID)} className="w-full flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors">
             <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${selected.has(f.userID) ? "bg-primary-500 border-primary-500" : "border-gray-300"}`}>

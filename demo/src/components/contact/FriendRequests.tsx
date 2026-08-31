@@ -16,6 +16,7 @@ export default function FriendRequests() {
   const [showShareCard, setShowShareCard] = useState(false);
   const [shareUserID, setShareUserID] = useState("");
   const [addUserID, setAddUserID] = useState("");
+  const [addSuccess, setAddSuccess] = useState(false);
 
   const addFriend = useAppStore((s) => s.addFriend);
 
@@ -25,7 +26,10 @@ export default function FriendRequests() {
       await addFriend(addUserID.trim(), "请求添加好友");
       setAddUserID("");
       setShowScan(false);
+      setAddSuccess(true);
+      setTimeout(() => setAddSuccess(false), 3000);
     } catch (e) {
+      alert("添加失败: " + (e as any)?.message || "请检查用户ID是否正确");
       console.error(e);
     }
   };
@@ -100,10 +104,15 @@ export default function FriendRequests() {
       )}
 
       {/* Scan/Add modal */}
+      {addSuccess && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[60] bg-green-500 text-white px-4 py-2 rounded-xl text-sm shadow-lg">好友申请已发送，等待对方确认</div>
+      )}
+
       {showScan && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setShowScan(false)}>
           <div className="bg-white rounded-2xl p-8 flex flex-col items-center gap-4 w-80" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-semibold text-gray-800">添加好友</h3>
+            <p className="text-xs text-gray-400 mb-2">提示：对方需要先注册 99chat，输入对方的用户 ID</p>
             <input
               value={addUserID}
               onChange={(e) => setAddUserID(e.target.value)}
