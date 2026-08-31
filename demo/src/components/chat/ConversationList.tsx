@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
-import { Search, Plus, Pin, BellOff, Trash2, MoreVertical, UserPlus, Users, UserSearch } from "lucide-react";
+import { Search, Plus, Pin, BellOff, Trash2, MoreVertical, UserPlus, Users, UserSearch, Check } from "lucide-react";
 import { useAppStore } from "../../store/app-store";
 import { formatTime } from "../../utils/format";
 import { SessionType } from "@openim/wasm-client-sdk";
@@ -19,6 +19,11 @@ export default function ConversationList() {
   const [search, setSearch] = useState("");
   const [menuConv, setMenuConv] = useState<string | null>(null);
   const [showPlusMenu, setShowPlusMenu] = useState(false);
+  const [showAddFriend, setShowAddFriend] = useState(false);
+  const [friendID, setFriendID] = useState("");
+  const [addSuccess, setAddSuccess] = useState(false);
+  const [addError, setAddError] = useState("");
+  const addFriend = useAppStore((s) => s.addFriend);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -78,7 +83,7 @@ export default function ConversationList() {
             <button onClick={() => setShowPlusMenu(!showPlusMenu)} className="text-gray-400 hover:text-primary-500"><Plus size={20} /></button>
             {showPlusMenu && (
               <div className="absolute right-0 top-full mt-2 z-50 bg-white rounded-xl shadow-xl border border-gray-100 py-1 w-36 text-sm" onClick={() => setShowPlusMenu(false)}>
-                <button onClick={() => navigate("/contact/requests")} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><UserPlus size={14} /> 添加好友</button>
+                <button onClick={() => { setShowPlusMenu(false); setShowAddFriend(true); }} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><UserPlus size={14} /> 添加好友</button>
                 <button onClick={() => navigate("/contact/create-group")} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><Users size={14} /> 创建群聊</button>
                 <button onClick={() => navigate("/contact/search/user")} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><UserSearch size={14} /> 搜索用户</button>
                 <button onClick={() => navigate("/contact/search/group")} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><Search size={14} /> 搜索群组</button>
@@ -185,6 +190,51 @@ export default function ConversationList() {
         </div>
       </div>
       <Outlet />
+
+      {/* Add Friend Modal */}
+      {showAddFriend && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setShowAddFriend(false)}>
+          <div className="bg-white rounded-2xl p-6 w-80" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-base font-semibold text-gray-800 mb-1">添加好友</h3>
+            <p className="text-xs text-gray-400 mb-4">输入对方的用户 ID 发送好友申请</p>
+            {addSuccess ? (
+              <div className="text-center py-4">
+                <div className="w-12 h-12 mx-auto rounded-full bg-green-50 flex items-center justify-center text-green-500 mb-3"><Check size={24} /></div>
+                <p className="text-sm text-gray-600">好友申请已发送，等待对方确认</p>
+                <button onClick={() => { setShowAddFriend(false); setAddSuccess(false); setFriendID(""); }} className="mt-4 w-full py-2 bg-gray-50 text-gray-500 rounded-lg text-sm hover:bg-gray-100">关闭</button>
+              </div>
+            ) : (
+              <>
+                {addError && <div className="mb-3 px-3 py-2 bg-red-50 text-red-500 text-sm rounded-lg">{addError}</div>}
+                <input
+                  value={friendID}
+                  onChange={(e) => { setFriendID(e.target.value); setAddError(""); }}
+                  placeholder="请输入用户 ID"
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:border-primary-500 mb-4"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && friendID.trim()) {
+                      addFriend(friendID.trim(), "请求添加好友")
+                        .then(() => { setAddSuccess(true); })
+                        .catch((err) => { setAddError(err?.message || "发送失败，请检查用户 ID"); });
+                    }
+                  }}
+                />
+                <div className="flex gap-2">
+                  <button onClick={() => { setShowAddFriend(false); setFriendID(""); setAddError(""); }} className="flex-1 py-2.5 bg-gray-50 text-gray-500 rounded-xl text-sm hover:bg-gray-100">取消</button>
+                  <button
+                    onClick={() => {
+                      if (!friendID.trim()) return;
+                      addFriend(friendID.trim(), "请求添加好友")
+                        .then(() => { setAddSuccess(true); })
+                        .catch((err) => { setAddError(err?.message || "发送失败，请检查用户 ID"); });
+                    }}
+                    className="flex-1 py-2.5 bg-primary-500 text-white rounded-xl text-sm hover:bg-primary-600">发送申请</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </>
   );
 }
