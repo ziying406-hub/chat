@@ -742,10 +742,12 @@ export const useAppStore = create<AppState>()(
 
     createGroup: async (name, memberUserIDs) => {
       const im = getIMSDK();
-      const res = await im.createGroup({ memberUserIDs, groupInfo: { groupName: name } });
+      const res = await im.createGroup({ memberUserIDs, groupInfo: { groupName: name, groupType: 2 } } as any);
       if (res.data) {
         const groupRes = await im.getJoinedGroupList();
         set((s) => { s.groups = groupRes.data || []; });
+      } else {
+        throw new Error("创建群组失败");
       }
     },
 

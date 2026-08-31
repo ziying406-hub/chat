@@ -10,6 +10,7 @@ export default function CreateGroup() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [groupName, setGroupName] = useState("");
   const [creating, setCreating] = useState(false);
+  const [error, setError] = useState("");
 
   const toggle = (id: string) => {
     const next = new Set(selected);
@@ -20,11 +21,12 @@ export default function CreateGroup() {
   const handleCreate = async () => {
     if (selected.size === 0 || !groupName.trim()) return;
     setCreating(true);
+    setError("");
     try {
       await createGroup(groupName.trim(), Array.from(selected));
       navigate("/contact/groups");
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      setError(e?.message || "创建失败，请重试");
     }
     setCreating(false);
   };
@@ -63,7 +65,8 @@ export default function CreateGroup() {
         ))}
       </div>
 
-      <div className="px-5 py-4 bg-white border-t border-gray-100">
+      {error && <div className="px-5 py-2 bg-red-50 text-red-500 text-sm text-center">{error}</div>}
+      <div className="px-5 py-4 bg-white border-t border-gray-100 sticky bottom-0 z-20">
         <button onClick={handleCreate} disabled={selected.size === 0 || !groupName.trim() || creating}
           className={`w-full py-3 rounded-xl text-sm font-medium transition-colors ${selected.size > 0 && groupName.trim() && !creating ? "bg-primary-500 text-white hover:bg-primary-600" : "bg-gray-100 text-gray-300"}`}>
           {creating ? "创建中..." : `完成（${selected.size}）`}
