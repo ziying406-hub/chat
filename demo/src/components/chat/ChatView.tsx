@@ -24,6 +24,9 @@ export default function ChatView() {
   const sendText = useAppStore((s) => s.sendTextMessage);
   const sendImage = useAppStore((s) => s.sendImageMessage);
   const sendSound = useAppStore((s) => s.sendSoundMessage);
+  const sendFile = useAppStore((s) => s.sendFileMessage);
+  const sendVideo = useAppStore((s) => s.sendVideoMessage);
+  const forwardMsg = useAppStore((s) => s.forwardMessage);
   const markRead = useAppStore((s) => s.markRead);
   const revokeMsg = useAppStore((s) => s.revokeMessage);
   const groupMembers = useAppStore((s) => s.groupMembersMap);
@@ -53,7 +56,9 @@ export default function ChatView() {
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [showContactPicker, setShowContactPicker] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageFileRef = useRef<HTMLInputElement>(null);
+  const docFileRef = useRef<HTMLInputElement>(null);
+  const videoFileRef = useRef<HTMLInputElement>(null);
   const msgEndRef = useRef<HTMLDivElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -174,7 +179,21 @@ export default function ChatView() {
     toastTimerRef.current = setTimeout(() => setToast(null), 2000);
   };
 
-  const handleImageSelect = () => fileInputRef.current?.click();
+  const handleImageSelect = () => imageFileRef.current?.click();
+  const handleFileSelect = () => docFileRef.current?.click();
+  const handleVideoSelect = () => videoFileRef.current?.click();
+
+  const handleDocFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && id) sendFile(id, file);
+    e.target.value = "";
+  };
+
+  const handleVideoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && id) sendVideo(id, file, 0);
+    e.target.value = "";
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -264,7 +283,9 @@ export default function ChatView() {
       </div>
 
       {/* Hidden file input */}
-      <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+      <input ref={imageFileRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+      <input ref={docFileRef} type="file" onChange={handleDocFileChange} className="hidden" />
+      <input ref={videoFileRef} type="file" accept="video/*" onChange={handleVideoFileChange} className="hidden" />
 
       {/* Search bar */}
       {showSearch && (
@@ -391,6 +412,33 @@ export default function ChatView() {
                       <div className="px-3.5 py-2.5 rounded-2xl text-sm bg-gray-100 text-gray-500">{msg.customElem?.description || "[自定义消息]"}</div>
                     )}
 
+
+                    {/* File */}
+                    {type === MessageType.FileMessage && (() => {
+                      const fileElem = msg.fileElem;
+                      return (
+                        <div className={`flex items-center gap-3 px-3.5 py-2.5 rounded-2xl ${self ? "bg-primary-500 text-white rounded-tr-md" : "bg-white text-gray-700 rounded-tl-md shadow-sm"}`}>
+                          <Paperclip size={18} />
+                          <div>
+                            <p className="text-sm font-medium">{fileElem?.fileName || "文件"}</p>
+                            <p className="text-xs opacity-60">{fileElem ? Math.round((fileElem.fileSize || 0) / 1024) + "KB" : ""}</p>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                    {/* Video */}
+                    {type === MessageType.VideoMessage && (() => {
+                      const vidElem = msg.videoElem;
+                      return (
+                        <div className="relative cursor-pointer">
+                          {vidElem?.snapshotUrl && <img src={vidElem.snapshotUrl} alt="" className="max-w-[240px] max-h-[200px] rounded-xl object-cover" />}
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-xl">
+                            <div className="w-12 h-12 rounded-full bg-white/80 flex items-center justify-center"><Play size={24} className="text-gray-700 ml-1" /></div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
                     {/* Status */}
                     {self && type < 900 && (
                       <div className="flex items-center justify-end gap-1 mt-0.5 pr-1">
@@ -407,7 +455,20 @@ export default function ChatView() {
                       <div className={`absolute z-50 bg-white rounded-xl shadow-xl border border-gray-100 py-1 w-32 text-sm ${self ? "right-0" : "left-0"} top-full mt-1`} onClick={(e) => e.stopPropagation()}>
                         <button onClick={() => { setQuoteMessage(msg); setContextMsg(null); }} className="w-full px-3 py-1.5 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><Reply size={12} /> 回复</button>
                         {type === MessageType.TextMessage && <button onClick={() => { navigator.clipboard?.writeText(msg.textElem?.content || ""); setContextMsg(null); }} className="w-full px-3 py-1.5 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><Copy size={12} /> 复制</button>}
-                        <button className="w-full px-3 py-1.5 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><Forward size={12} /> 转发</button>
+                        <button onClick={() => {
+                    if (!id) return;
+                    // Find conversation to forward to
+                    const convs = useAppStore.getState().conversations.filter(c2 => c2.conversationID !== id);
+                    if (convs.length === 0) { alert("没有其他会话可转发"); return; }
+                    const target = prompt("转发到会话:\n" + convs.map((c2, i) => `${i + 1}. ${c2.showName}`).join("\n") + "\n输入序号:");
+                    if (target) {
+                      const idx = parseInt(target) - 1;
+                      if (idx >= 0 && idx < convs.length) {
+                        forwardMsg(convs[idx].conversationID, msg);
+                        setContextMsg(null);
+                      }
+                    }
+                  }} className="w-full px-3 py-1.5 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><Forward size={12} /> 转发</button>
                         {self && canRevoke(msg) && <button onClick={() => { revokeMsg(id!, msg.clientMsgID); setContextMsg(null); }} className="w-full px-3 py-1.5 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><RotateCcw size={12} /> 撤回</button>}
                         {self && !canRevoke(msg) && <button onClick={() => { setContextMsg(null); showToast("超过2分钟无法撤回"); }} className="w-full px-3 py-1.5 text-left hover:bg-gray-50 text-gray-300 flex items-center gap-2"><RotateCcw size={12} /> 撤回</button>}
                         <button className="w-full px-3 py-1.5 text-left hover:bg-gray-50 text-red-400 flex items-center gap-2"><Trash2 size={12} /> 删除</button>

@@ -231,7 +231,7 @@ export default function Login() {
         </div>
 
         <div className="mt-6 pt-4 border-t border-gray-100 text-center">
-          <p className="text-xs text-gray-300">登录即代表同意《用户协议》和《隐私政策》</p>
+          <p className="text-xs text-gray-300"><Link to="/auth/agreement" className="text-primary-500 hover:underline">《用户协议》</Link> 和 <Link to="/auth/privacy" className="text-primary-500 hover:underline">《隐私政策》</Link></p>
         </div>
       </div>
     </div>

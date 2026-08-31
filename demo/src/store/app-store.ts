@@ -78,6 +78,9 @@ interface AppState {
   sendTextMessage: (conversationID: string, text: string) => Promise<void>;
   sendImageMessage: (conversationID: string, file: File) => Promise<void>;
   sendSoundMessage: (conversationID: string, file: File, duration: number) => Promise<void>;
+  sendFileMessage: (conversationID: string, file: File) => Promise<void>;
+  sendVideoMessage: (conversationID: string, file: File, duration: number) => Promise<void>;
+  forwardMessage: (conversationID: string, message: any) => Promise<void>;
   markRead: (conversationID: string) => Promise<void>;
   pinConversation: (conversationID: string, isPinned: boolean) => Promise<void>;
   muteConversation: (conversationID: string, opt: number) => Promise<void>;
@@ -424,6 +427,57 @@ export const useAppStore = create<AppState>()(
           });
         }
       } catch (e) { console.error("sendSound:", e); }
+    },
+
+
+    sendFileMessage: async (conversationID, file) => {
+      const im = getIMSDK();
+      const state = get();
+      const conv = state.conversations.find((c) => c.conversationID === conversationID);
+      if (!conv) return;
+      try {
+        const msgRes = await im.createFileMessage(file.name, file.name);
+        const message = msgRes.data;
+        if (!message) return;
+        set((s) => { if (!s.messagesMap[conversationID]) s.messagesMap[conversationID] = []; s.messagesMap[conversationID].push(message); });
+        const params: any = { recvID: conv.conversationType === SessionType.Single ? conv.userID : "", groupID: conv.conversationType === SessionType.Group ? conv.groupID : "", message };
+        const sendRes = await im.sendMessage(params);
+        if (sendRes.data) {
+          set((s) => { const msgs = s.messagesMap[conversationID]; if (msgs) { const idx = msgs.findIndex((m) => m.clientMsgID === message.clientMsgID); if (idx >= 0) msgs[idx] = sendRes.data!; } });
+        }
+      } catch (e) { console.error("sendFile:", e); }
+    },
+
+    sendVideoMessage: async (conversationID, file, duration) => {
+      const im = getIMSDK();
+      const state = get();
+      const conv = state.conversations.find((c) => c.conversationID === conversationID);
+      if (!conv) return;
+      try {
+        const msgRes = await im.createVideoMessage(URL.createObjectURL(file), file.type, duration, "");
+        const message = msgRes.data;
+        if (!message) return;
+        set((s) => { if (!s.messagesMap[conversationID]) s.messagesMap[conversationID] = []; s.messagesMap[conversationID].push(message); });
+        const params: any = { recvID: conv.conversationType === SessionType.Single ? conv.userID : "", groupID: conv.conversationType === SessionType.Group ? conv.groupID : "", message };
+        const sendRes = await im.sendMessage(params);
+        if (sendRes.data) {
+          set((s) => { const msgs = s.messagesMap[conversationID]; if (msgs) { const idx = msgs.findIndex((m) => m.clientMsgID === message.clientMsgID); if (idx >= 0) msgs[idx] = sendRes.data!; } });
+        }
+      } catch (e) { console.error("sendVideo:", e); }
+    },
+
+    forwardMessage: async (conversationID, message) => {
+      const im = getIMSDK();
+      const state = get();
+      const conv = state.conversations.find((c) => c.conversationID === conversationID);
+      if (!conv) return;
+      try {
+        const params: any = { recvID: conv.conversationType === SessionType.Single ? conv.userID : "", groupID: conv.conversationType === SessionType.Group ? conv.groupID : "", message };
+        const sendRes = await im.sendMessage(params);
+        if (sendRes.data) {
+          set((s) => { if (!s.messagesMap[conversationID]) s.messagesMap[conversationID] = []; s.messagesMap[conversationID].push(sendRes.data!); });
+        }
+      } catch (e) { console.error("forward:", e); }
     },
 
     markRead: async (conversationID) => {
