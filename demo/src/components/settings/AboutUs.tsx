@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Github, MessageSquare, FileText, Shield, Code } from "lucide-react";
+import { ArrowLeft, GitFork, MessageSquare, FileText, Shield, Code } from "lucide-react";
 
 export default function AboutUs() {
   const navigate = useNavigate();
@@ -31,7 +31,7 @@ export default function AboutUs() {
           rel="noopener noreferrer"
           className="flex items-center gap-3 px-5 py-3.5 hover:bg-gray-50 transition-colors border-b border-gray-50"
         >
-          <Github size={18} className="text-gray-400" />
+          <GitFork size={18} className="text-gray-400" />
           <span className="text-sm text-gray-600 flex-1">GitHub</span>
           <span className="text-xs text-gray-300">openim-samples</span>
         </a>

@@ -134,25 +134,18 @@ export type {
 // ---------- FCM Push ----------
 
 export async function registerFCM(): Promise<void> {
-  let firebase: any;
   try {
-    firebase = await import("firebase/messaging");
-  } catch {
-    // Firebase SDK not installed — skip FCM registration
-    return;
-  }
-
-  try {
+    const mod = "firebase" + "/messaging";
+    const firebase: any = await import(/* @vite-ignore */ mod);
     const messaging = firebase.getMessaging();
     const token = await firebase.getToken(messaging, {
-      vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY,
+      vapidKey: (import.meta as any).env?.VITE_FIREBASE_VAPID_KEY,
     });
     if (!token) return;
-
-    const expireTime = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60; // 7 days
+    const expireTime = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60;
     const im = getIMSDK();
     await im.updateFcmToken(token, expireTime);
-  } catch (e) {
-    console.warn("FCM registration failed:", e);
+  } catch (e: any) {
+    console.warn("FCM registration skipped:", e?.message || e);
   }
 }

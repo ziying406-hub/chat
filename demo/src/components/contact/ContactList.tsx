@@ -1,5 +1,5 @@
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
-import { Search, UserPlus, Users, Tag, UserSearch, GroupSearch } from "lucide-react";
+import { Search, UserPlus, Users, Tag, UserSearch } from "lucide-react";
 import { useAppStore } from "../../store/app-store";
 import { useState } from "react";
 
@@ -64,7 +64,7 @@ export default function ContactList() {
             onClick={() => navigate("/contact/search/group")}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-50 transition-colors"
           >
-            <div className="w-9 h-9 rounded-lg bg-purple-50 flex items-center justify-center text-purple-500"><GroupSearch size={18} /></div>
+            <div className="w-9 h-9 rounded-lg bg-purple-50 flex items-center justify-center text-purple-500"><Users size={18} /></div>
             <span className="text-sm font-medium">搜索群组</span>
           </button>
           <button

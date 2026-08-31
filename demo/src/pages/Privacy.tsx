@@ -28,7 +28,7 @@ export default function Privacy() {
         <h4 className="font-medium text-gray-700 mt-4">7. 数据删除</h4>
         <p>您可以删除会话、好友、退出群组。注销账号后，您的数据将在 30 天内删除。</p>
         <h4 className="font-medium text-gray-700 mt-4">8. 联系我们</h4>
-        <p>如有隐私问题，请通过开发者工具 > 用户反馈提交。</p>
+        <p>如有隐私问题，请通过开发者工具 &gt; 用户反馈提交。</p>
       </div>
     </div>
   );
