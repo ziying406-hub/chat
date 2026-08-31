@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
-import { Search, Plus, Pin, BellOff, Trash2, MoreVertical } from "lucide-react";
+import { Search, Plus, Pin, BellOff, Trash2, MoreVertical, UserPlus, Users, UserSearch } from "lucide-react";
 import { useAppStore } from "../../store/app-store";
 import { formatTime } from "../../utils/format";
 import { SessionType } from "@openim/wasm-client-sdk";
@@ -18,6 +18,7 @@ export default function ConversationList() {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [menuConv, setMenuConv] = useState<string | null>(null);
+  const [showPlusMenu, setShowPlusMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -73,7 +74,17 @@ export default function ConversationList() {
         <div className="px-4 pt-4 pb-2">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold text-gray-800">消息</h2>
-            <button className="text-gray-400 hover:text-primary-500"><Plus size={20} /></button>
+            <div className="relative">
+            <button onClick={() => setShowPlusMenu(!showPlusMenu)} className="text-gray-400 hover:text-primary-500"><Plus size={20} /></button>
+            {showPlusMenu && (
+              <div className="absolute right-0 top-full mt-2 z-50 bg-white rounded-xl shadow-xl border border-gray-100 py-1 w-36 text-sm" onClick={() => setShowPlusMenu(false)}>
+                <button onClick={() => navigate("/contact/requests")} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><UserPlus size={14} /> 添加好友</button>
+                <button onClick={() => navigate("/contact/create-group")} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><Users size={14} /> 创建群聊</button>
+                <button onClick={() => navigate("/contact/search/user")} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><UserSearch size={14} /> 搜索用户</button>
+                <button onClick={() => navigate("/contact/search/group")} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><Search size={14} /> 搜索群组</button>
+              </div>
+            )}
+          </div>
           </div>
           <div className="relative">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" />
