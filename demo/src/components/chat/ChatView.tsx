@@ -326,12 +326,35 @@ export default function ChatView() {
           {messages.length === 0 && <div className="flex justify-center py-20 text-gray-300 text-sm">暂无消息，发送第一条消息吧</div>}
           {messages.map((msg: any, idx: number) => {
             const type = msg.contentType;
-            if (type === MessageType.NotificationMessage || type >= 900) {
+            // System notification messages (FriendAdded=1201, GroupCreated=1501, etc.)
+            if (type >= 1000 && type !== MessageType.CustomMessage) {
+              // Parse notification detail for friendly display
+              let displayText = '[系统通知]';
+              if (type === 1201) displayText = '你们已成为好友';
+              else if (type === 1501) displayText = '群组已创建';
+              else if (type === 1502) displayText = '群信息已更新';
+              else if (type === 1504) displayText = '有成员退出群组';
+              else if (type === 1507) displayText = '群主已转让';
+              else if (type === 1508) displayText = '有成员被移出';
+              else if (type === 1509) displayText = '有成员被邀请加入';
+              else if (type === 1510) displayText = '有成员加入群组';
+              else if (type === 1511) displayText = '群组已解散';
+              else if (type === 1512) displayText = '有成员被禁言';
+              else if (type === 1513) displayText = '有成员被解除禁言';
+              else if (type === 1514) displayText = '群组已被禁言';
+              else if (type === 1515) displayText = '群组已被解除禁言';
+              else if (type === 1519) displayText = '群公告已更新';
+              else if (type === 1520) displayText = '群名称已更新';
+              else if (type === 2101) displayText = '消息已撤回';
+              else if (msg.notificationElem?.detail) {
+                try { displayText = JSON.parse(msg.notificationElem.detail).op || displayText; } catch {}
+              }
+              return <div key={msg.clientMsgID} className='flex justify-center py-2'><span className='text-xs text-gray-400 bg-gray-200/50 px-3 py-1 rounded-full'>{displayText}</span></div>;
               return <div key={msg.clientMsgID} className="flex justify-center py-2"><span className="text-xs text-gray-400 bg-gray-200/50 px-3 py-1 rounded-full">{msg.notificationElem?.detail || "[系统通知]"}</span></div>;
             }
             const self = isSelf(msg);
             const prevMsg = idx > 0 ? messages[idx - 1] : null;
-            const showAvatar = !prevMsg || prevMsg.sendID !== msg.sendID || (prevMsg as any).contentType >= 900;
+            const showAvatar = !prevMsg || prevMsg.sendID !== msg.sendID || (prevMsg as any).contentType >= 1000;
 
             return (
               <div key={msg.clientMsgID} ref={(el) => { msgRefs.current[msg.clientMsgID] = el; }} onContextMenu={(e) => { e.preventDefault(); setContextMsg(msg.clientMsgID); }} className={`flex items-start gap-2 ${self ? "flex-row-reverse" : "flex-row"} ${showAvatar ? "mt-3" : "mt-0.5"}`}>
