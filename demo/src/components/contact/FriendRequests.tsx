@@ -19,6 +19,24 @@ export default function FriendRequests() {
   const [addSuccess, setAddSuccess] = useState(false);
 
   const addFriend = useAppStore((s) => s.addFriend);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      const { getIMSDK } = await import("../../services/openim");
+      const im = getIMSDK();
+      const res = await im.getFriendApplicationListAsRecipient();
+      const { useAppStore } = await import("../../store/app-store");
+      useAppStore.setState({ friendRequests: res.data || [] });
+      const frRes = await im.getFriendList();
+      useAppStore.setState({ friends: frRes.data || [] });
+    } catch (e) { console.error(e); }
+    setRefreshing(false);
+  };
+
+  // Auto-refresh on mount
+  useState(() => { handleRefresh(); });
 
   const handleAdd = async () => {
     if (!addUserID.trim()) return;
@@ -39,6 +57,7 @@ export default function FriendRequests() {
       <div className="bg-white px-5 py-4 border-b border-gray-100 flex items-center gap-3">
         <button onClick={() => navigate("/contact")} className="text-gray-400 hover:text-gray-600"><ArrowLeft size={20} /></button>
         <h2 className="text-base font-semibold text-gray-800">新的朋友</h2>
+        <button onClick={handleRefresh} disabled={refreshing} className="ml-auto text-sm text-primary-500 hover:text-primary-600 disabled:opacity-50">{refreshing ? "刷新中..." : "刷新"}</button>
       </div>
 
       {/* Quick actions */}
@@ -75,14 +94,14 @@ export default function FriendRequests() {
               <p className="text-sm font-medium text-gray-800">{r.fromNickname || r.fromUserID}</p>
               <p className="text-xs text-gray-400 mt-0.5">"{r.reqMsg || "请求添加好友"}"</p>
             </div>
-            {r.handleStatus === ApplicationHandleResult.Unprocessed ? (
+            {r.handleResult === ApplicationHandleResult.Unprocessed ? (
               <div className="flex gap-2">
                 <button onClick={() => accept(r.fromUserID)} className="w-9 h-9 rounded-lg bg-primary-50 text-primary-500 hover:bg-primary-100 transition-colors flex items-center justify-center"><Check size={18} /></button>
                 <button onClick={() => reject(r.fromUserID)} className="w-9 h-9 rounded-lg bg-gray-50 text-gray-400 hover:bg-gray-100 transition-colors flex items-center justify-center"><X size={18} /></button>
               </div>
             ) : (
-              <span className={`text-xs px-3 py-1 rounded-full ${r.handleStatus === ApplicationHandleResult.Accepted ? "bg-green-50 text-green-500" : "bg-gray-100 text-gray-400"}`}>
-                {r.handleStatus === ApplicationHandleResult.Accepted ? "已通过" : "已拒绝"}
+              <span className={`text-xs px-3 py-1 rounded-full ${r.handleResult === ApplicationHandleResult.Accepted ? "bg-green-50 text-green-500" : "bg-gray-100 text-gray-400"}`}>
+                {r.handleResult === ApplicationHandleResult.Accepted ? "已通过" : "已拒绝"}
               </span>
             )}
           </div>

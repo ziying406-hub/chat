@@ -99,6 +99,10 @@ html.dark ::-webkit-scrollbar-thumb:hover {
     height: 56px;
     background: #ffffff;
     border-top: 1px solid #f0f0f0;
-    z-index: 50;
+    z-index: 30;
+  }
+  /* Add bottom padding so content isn't hidden behind tabbar */
+  .flex.h-screen {
+    padding-bottom: 56px;
   }
 }

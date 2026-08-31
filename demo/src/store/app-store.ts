@@ -82,6 +82,7 @@ interface AppState {
   sendVideoMessage: (conversationID: string, file: File, duration: number) => Promise<void>;
   forwardMessage: (conversationID: string, message: any) => Promise<void>;
   markRead: (conversationID: string) => Promise<void>;
+  refreshConversations: () => Promise<void>;
   pinConversation: (conversationID: string, isPinned: boolean) => Promise<void>;
   muteConversation: (conversationID: string, opt: number) => Promise<void>;
   deleteConversation: (conversationID: string) => Promise<void>;
@@ -256,6 +257,7 @@ export const useAppStore = create<AppState>()(
       } catch {}
 
       on(CbEvents.OnConversationChanged, (convs: ConversationItem[]) => {
+        if (!convs || !Array.isArray(convs)) return;
         set((s) => {
           for (const conv of convs) {
             const idx = s.conversations.findIndex((c) => c.conversationID === conv.conversationID);
@@ -265,6 +267,7 @@ export const useAppStore = create<AppState>()(
         });
       });
       on(CbEvents.OnNewConversation, (convs: ConversationItem[]) => {
+        if (!convs || !Array.isArray(convs)) return;
         set((s) => {
           for (const conv of convs) {
             if (!s.conversations.find((c) => c.conversationID === conv.conversationID)) {
@@ -488,6 +491,14 @@ export const useAppStore = create<AppState>()(
       } catch (e) { console.error("markRead:", e); }
     },
 
+    refreshConversations: async () => {
+      const im = getIMSDK();
+      try {
+        const res = await im.getAllConversationList();
+        set((s) => { s.conversations = res.data || []; });
+      } catch (e) { console.error("refreshConv:", e); }
+    },
+
     pinConversation: async (conversationID, isPinned) => {
       const im = getIMSDK();
       try { await im.setConversation({ conversationID, isPinned }); } catch (e) { console.error("pin:", e); }
@@ -679,6 +690,10 @@ export const useAppStore = create<AppState>()(
       set((s) => { s.friendRequests = res.data || []; });
       const frRes = await im.getFriendList();
       set((s) => { s.friends = frRes.data || []; });
+      // Refresh conversations to pick up new friend conversations
+      await new Promise(r => setTimeout(r, 2000));
+      const convRes = await im.getAllConversationList();
+      set((s) => { s.conversations = convRes.data || []; });
     },
     rejectFriendRequest: async (userID) => {
       const im = getIMSDK();
@@ -696,6 +711,10 @@ export const useAppStore = create<AppState>()(
       await im.updateFriends({ friendUserIDs: [userID], remark });
       const frRes = await im.getFriendList();
       set((s) => { s.friends = frRes.data || []; });
+      // Refresh conversations to pick up new friend conversations
+      await new Promise(r => setTimeout(r, 2000));
+      const convRes = await im.getAllConversationList();
+      set((s) => { s.conversations = convRes.data || []; });
     },
     loadBlackList: async () => {
       const im = getIMSDK();
