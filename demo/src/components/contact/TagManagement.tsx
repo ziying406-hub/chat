@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Plus, Tag as TagIcon, Edit2, Trash2, X, Check, UserPlus, UserMinus } from "lucide-react";
+import { ArrowLeft, Plus, Tag as TagIcon, Edit2, Trash2, X, Check, UserPlus } from "lucide-react";
 import { useAppStore } from "../../store/app-store";
 
 export default function TagManagement() {
@@ -19,6 +19,8 @@ export default function TagManagement() {
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
   const [showAddMember, setShowAddMember] = useState(false);
   const [addMemberTagID, setAddMemberTagID] = useState<string | null>(null);
+  const [confirmDeleteTagID, setConfirmDeleteTagID] = useState<string | null>(null);
+  const [confirmRemoveMember, setConfirmRemoveMember] = useState<{ tagID: string; userID: string; memberName: string } | null>(null);
 
   useEffect(() => { loadTags(); }, [loadTags]);
 
@@ -84,6 +86,8 @@ export default function TagManagement() {
     setShowEdit(true);
   };
 
+  const confirmDeleteTag = tags.find((t) => t.tagID === confirmDeleteTagID);
+
   return (
     <div className="flex-1 flex flex-col bg-gray-50 overflow-y-auto">
       <div className="bg-white px-5 py-4 border-b border-gray-100 flex items-center gap-3">
@@ -127,7 +131,7 @@ export default function TagManagement() {
                 <Edit2 size={15} />
               </button>
               <button
-                onClick={(e) => { e.stopPropagation(); handleDelete(tag.tagID); }}
+                onClick={(e) => { e.stopPropagation(); setConfirmDeleteTagID(tag.tagID); }}
                 className="w-8 h-8 rounded-lg hover:bg-red-50 flex items-center justify-center text-gray-400 hover:text-red-500"
               >
                 <Trash2 size={15} />
@@ -141,11 +145,12 @@ export default function TagManagement() {
                   <div className="flex flex-wrap gap-2 py-2">
                     {tag.memberIDs.map((uid) => {
                       const f = friends.find((fr) => fr.userID === uid);
+                      const memberName = f?.remark || f?.nickname || uid;
                       return (
                         <div key={uid} className="flex items-center gap-1.5 bg-white rounded-full pl-1 pr-2 py-0.5 border border-gray-100">
                           <img src={f?.faceURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${uid}`} alt="" className="w-5 h-5 rounded-full" />
-                          <span className="text-xs text-gray-600">{f?.remark || f?.nickname || uid}</span>
-                          <button onClick={() => removeMember(tag.tagID, uid)} className="text-gray-300 hover:text-red-400">
+                          <span className="text-xs text-gray-600">{memberName}</span>
+                          <button onClick={() => setConfirmRemoveMember({ tagID: tag.tagID, userID: uid, memberName })} className="text-gray-300 hover:text-red-400">
                             <X size={12} />
                           </button>
                         </div>
@@ -244,6 +249,32 @@ export default function TagManagement() {
             <div className="flex gap-3 justify-end px-5 py-4 border-t border-gray-100">
               <button onClick={() => setShowAddMember(false)} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">取消</button>
               <button onClick={confirmAddMember} className="px-4 py-2 text-sm bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors">确定</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete tag confirmation */}
+      {confirmDeleteTag && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setConfirmDeleteTagID(null)}>
+          <div className="bg-white rounded-2xl p-6 w-72 max-w-[90%] flex flex-col items-center gap-4" onClick={(e) => e.stopPropagation()}>
+            <p className="text-sm text-gray-700 text-center">确定删除标签 '{confirmDeleteTag.name}'？</p>
+            <div className="flex gap-3 w-full">
+              <button onClick={() => setConfirmDeleteTagID(null)} className="flex-1 px-4 py-2 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg">取消</button>
+              <button onClick={() => { handleDelete(confirmDeleteTag.tagID); setConfirmDeleteTagID(null); }} className="flex-1 px-4 py-2 text-sm text-white bg-red-500 hover:bg-red-600 rounded-lg">删除</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Remove member confirmation */}
+      {confirmRemoveMember && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setConfirmRemoveMember(null)}>
+          <div className="bg-white rounded-2xl p-6 w-72 max-w-[90%] flex flex-col items-center gap-4" onClick={(e) => e.stopPropagation()}>
+            <p className="text-sm text-gray-700 text-center">确定将 '{confirmRemoveMember.memberName}' 移出标签？</p>
+            <div className="flex gap-3 w-full">
+              <button onClick={() => setConfirmRemoveMember(null)} className="flex-1 px-4 py-2 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg">取消</button>
+              <button onClick={() => { removeMember(confirmRemoveMember.tagID, confirmRemoveMember.userID); setConfirmRemoveMember(null); }} className="flex-1 px-4 py-2 text-sm text-white bg-red-500 hover:bg-red-600 rounded-lg">移出</button>
             </div>
           </div>
         </div>

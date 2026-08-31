@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import {
   Phone, Video, MoreVertical, Smile, Paperclip, Send, Image as ImageIcon, Mic,
   ArrowLeft, RotateCcw, Copy, Trash2, Forward, Reply, Check, CheckCheck,
-  Play, Pause, X, Search, Contact,
+  Play, Pause, X, Search, Contact, UserPlus, BellOff, Star,
 
 } from "lucide-react";
 import { useAppStore } from "../../store/app-store";
@@ -37,6 +37,9 @@ export default function ChatView() {
   const searchMsgs = useAppStore((s) => s.searchLocalMessages);
   const groups = useAppStore((s) => s.groups);
   const sendContactCard = useAppStore((s) => s.sendContactCard);
+  const inviteToGroup = useAppStore((s) => s.inviteToGroup);
+  const muteConversation = useAppStore((s) => s.muteConversation);
+  const conversations = useAppStore((s) => s.conversations);
 
   const [input, setInput] = useState("");
   const [showMenu, setShowMenu] = useState(false);
@@ -55,6 +58,9 @@ export default function ChatView() {
   const [showAnnouncement, setShowAnnouncement] = useState(false);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [showContactPicker, setShowContactPicker] = useState(false);
+  const [showInvite, setShowInvite] = useState(false);
+  const [showForward, setShowForward] = useState(false);
+  const [forwardMsgData, setForwardMsgData] = useState<any | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const imageFileRef = useRef<HTMLInputElement>(null);
   const docFileRef = useRef<HTMLInputElement>(null);
@@ -275,6 +281,8 @@ export default function ChatView() {
                   <button onClick={() => navigate(`/contact/group/${conv.groupID}`)} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-600">群聊信息</button>
                   <button onClick={() => navigate(`/messages/groups/admin/${conv.groupID}`)} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-600">群管理</button>
                   <button onClick={() => setShowAnnouncement(true)} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-600">群公告</button>
+                  <button onClick={() => setShowInvite(true)} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><UserPlus size={14} /> 邀请好友</button>
+                  <button onClick={() => muteConversation(id!, conv.recvMsgOpt === 0 ? 2 : 0)} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><BellOff size={14} /> {conv.recvMsgOpt === 0 ? "消息免打扰" : "解除免打扰"}</button>
                 </>
               )}
             </div>
@@ -478,20 +486,17 @@ export default function ChatView() {
                       <div className={`absolute z-50 bg-white rounded-xl shadow-xl border border-gray-100 py-1 w-32 text-sm ${self ? "right-0" : "left-0"} top-full mt-1`} onClick={(e) => e.stopPropagation()}>
                         <button onClick={() => { setQuoteMessage(msg); setContextMsg(null); }} className="w-full px-3 py-1.5 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><Reply size={12} /> 回复</button>
                         {type === MessageType.TextMessage && <button onClick={() => { navigator.clipboard?.writeText(msg.textElem?.content || ""); setContextMsg(null); }} className="w-full px-3 py-1.5 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><Copy size={12} /> 复制</button>}
+                        <button onClick={() => { setForwardMsgData(msg); setShowForward(true); setContextMsg(null); }} className="w-full px-3 py-1.5 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><Forward size={12} /> 转发</button>
                         <button onClick={() => {
-                    if (!id) return;
-                    // Find conversation to forward to
-                    const convs = useAppStore.getState().conversations.filter(c2 => c2.conversationID !== id);
-                    if (convs.length === 0) { alert("没有其他会话可转发"); return; }
-                    const target = prompt("转发到会话:\n" + convs.map((c2, i) => `${i + 1}. ${c2.showName}`).join("\n") + "\n输入序号:");
-                    if (target) {
-                      const idx = parseInt(target) - 1;
-                      if (idx >= 0 && idx < convs.length) {
-                        forwardMsg(convs[idx].conversationID, msg);
-                        setContextMsg(null);
-                      }
-                    }
-                  }} className="w-full px-3 py-1.5 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><Forward size={12} /> 转发</button>
+                          try {
+                            const raw = localStorage.getItem("99chat_favorites");
+                            const favs = raw ? JSON.parse(raw) : [];
+                            favs.push({ clientMsgID: msg.clientMsgID, sendID: msg.sendID, content: msg.textElem?.content || "", contentType: msg.contentType, time: Date.now() });
+                            localStorage.setItem("99chat_favorites", JSON.stringify(favs));
+                          } catch {}
+                          showToast("已收藏");
+                          setContextMsg(null);
+                        }} className="w-full px-3 py-1.5 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><Star size={12} /> 收藏</button>
                         {self && canRevoke(msg) && <button onClick={() => { revokeMsg(id!, msg.clientMsgID); setContextMsg(null); }} className="w-full px-3 py-1.5 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><RotateCcw size={12} /> 撤回</button>}
                         {self && !canRevoke(msg) && <button onClick={() => { setContextMsg(null); showToast("超过2分钟无法撤回"); }} className="w-full px-3 py-1.5 text-left hover:bg-gray-50 text-gray-300 flex items-center gap-2"><RotateCcw size={12} /> 撤回</button>}
                         <button className="w-full px-3 py-1.5 text-left hover:bg-gray-50 text-red-400 flex items-center gap-2"><Trash2 size={12} /> 删除</button>
@@ -615,6 +620,76 @@ export default function ChatView() {
                     <p className="text-sm font-medium text-gray-700">{f.remark || f.nickname || f.userID}</p>
                     <p className="text-xs text-gray-400">ID: {f.userID}</p>
                   </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Invite friends modal */}
+      {showInvite && isGroup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setShowInvite(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-80 max-w-[90%] max-h-[60vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+              <h3 className="text-base font-semibold text-gray-800">邀请好友进群</h3>
+              <button onClick={() => setShowInvite(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {(() => {
+                const memberIDs = new Set((groupMembers[conv.groupID] || []).map((m) => m.userID));
+                const candidates = friends.filter((f) => !memberIDs.has(f.userID));
+                if (candidates.length === 0) return <div className="flex items-center justify-center py-10 text-gray-300 text-sm">暂无可邀请的好友</div>;
+                return candidates.map((f) => (
+                  <button
+                    key={f.userID}
+                    onClick={async () => {
+                      await inviteToGroup(conv.groupID, [f.userID], "邀请加入群组");
+                      setShowInvite(false);
+                      showToast("邀请已发送");
+                    }}
+                    className="w-full flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors"
+                  >
+                    <img src={f.faceURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${f.userID}`} alt="" className="w-10 h-10 rounded-lg object-cover bg-gray-100" />
+                    <div className="text-left">
+                      <p className="text-sm font-medium text-gray-700">{f.remark || f.nickname || f.userID}</p>
+                      <p className="text-xs text-gray-400">ID: {f.userID}</p>
+                    </div>
+                  </button>
+                ));
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Forward modal */}
+      {showForward && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setShowForward(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-80 max-w-[90%] max-h-[60vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+              <h3 className="text-base font-semibold text-gray-800">转发到</h3>
+              <button onClick={() => setShowForward(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {conversations.filter((c) => c.conversationID !== id).length === 0 && <div className="flex items-center justify-center py-10 text-gray-300 text-sm">没有其他会话</div>}
+              {conversations.filter((c) => c.conversationID !== id).map((c) => (
+                <button
+                  key={c.conversationID}
+                  onClick={async () => {
+                    try {
+                      await forwardMsg(c.conversationID, forwardMsgData);
+                      showToast("转发成功");
+                    } catch {
+                      showToast("转发失败");
+                    }
+                    setShowForward(false);
+                    setForwardMsgData(null);
+                  }}
+                  className="w-full flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors"
+                >
+                  <img src={c.faceURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${c.conversationID}`} alt="" className="w-10 h-10 rounded-lg object-cover bg-gray-100" />
+                  <span className="text-sm font-medium text-gray-700">{c.showName}</span>
                 </button>
               ))}
             </div>

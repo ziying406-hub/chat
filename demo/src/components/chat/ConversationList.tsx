@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
-import { Search, Plus, Pin, BellOff, Trash2, MoreVertical, UserPlus, Users, UserSearch, Check } from "lucide-react";
+import { Search, Plus, Pin, BellOff, Trash2, MoreVertical, UserPlus, Users, UserSearch, Check, CheckCheck } from "lucide-react";
 import { useAppStore } from "../../store/app-store";
 import { formatTime } from "../../utils/format";
 import { SessionType } from "@openim/wasm-client-sdk";
@@ -24,6 +24,7 @@ export default function ConversationList() {
   const [addSuccess, setAddSuccess] = useState(false);
   const [addError, setAddError] = useState("");
   const addFriend = useAppStore((s) => s.addFriend);
+  const markAllRead = useAppStore((s) => s.markAllRead);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -87,6 +88,7 @@ export default function ConversationList() {
                 <button onClick={() => navigate("/contact/create-group")} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><Users size={14} /> 创建群聊</button>
                 <button onClick={() => navigate("/contact/search/user")} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><UserSearch size={14} /> 搜索用户</button>
                 <button onClick={() => navigate("/contact/search/group")} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><Search size={14} /> 搜索群组</button>
+                <button onClick={() => { markAllRead(); setShowPlusMenu(false); }} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><CheckCheck size={14} /> 全部已读</button>
               </div>
             )}
           </div>

@@ -82,6 +82,7 @@ interface AppState {
   sendVideoMessage: (conversationID: string, file: File, duration: number) => Promise<void>;
   forwardMessage: (conversationID: string, message: any) => Promise<void>;
   markRead: (conversationID: string) => Promise<void>;
+  markAllRead: () => Promise<void>;
   refreshConversations: () => Promise<void>;
   pinConversation: (conversationID: string, isPinned: boolean) => Promise<void>;
   muteConversation: (conversationID: string, opt: number) => Promise<void>;
@@ -124,6 +125,7 @@ interface AppState {
   loadGroupApplications: () => Promise<void>;
   acceptGroupApplication: (groupID: string, fromUserID: string) => Promise<void>;
   refuseGroupApplication: (groupID: string, fromUserID: string) => Promise<void>;
+  setGroupMemberNickname: (groupID: string, userID: string, nickname: string) => Promise<void>;
 
   // Profile
   updateSelfInfo: (info: { nickname?: string; faceURL?: string; ex?: string }) => Promise<void>;
@@ -491,6 +493,17 @@ export const useAppStore = create<AppState>()(
       } catch (e) { console.error("markRead:", e); }
     },
 
+    markAllRead: async () => {
+      const im = getIMSDK();
+      try {
+        await im.markAllConversationMessageAsRead();
+        set((s) => {
+          s.conversations.forEach((c) => { c.unreadCount = 0; });
+          s.totalUnread = 0;
+        });
+      } catch (e) { console.error("markAllRead:", e); }
+    },
+
     refreshConversations: async () => {
       const im = getIMSDK();
       try {
@@ -818,6 +831,14 @@ export const useAppStore = create<AppState>()(
         await im.refuseGroupApplication({ groupID, fromUserID, handleMsg: "拒绝" } as any);
         await get().loadGroupApplications();
       } catch (e) { console.error("refuseGroupApp:", e); }
+    },
+
+    setGroupMemberNickname: async (groupID, userID, nickname) => {
+      const im = getIMSDK();
+      try {
+        await im.setGroupMemberInfo({ groupID, userID, nickname } as any);
+        await get().loadGroupMembers(groupID);
+      } catch (e) { console.error("setGroupMemberNickname:", e); }
     },
 
     loadOnlineStatus: async (userIDs) => {

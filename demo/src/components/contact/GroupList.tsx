@@ -1,10 +1,17 @@
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Users, Plus } from "lucide-react";
 import { useAppStore } from "../../store/app-store";
+import { useState } from "react";
 
 export default function GroupList() {
   const navigate = useNavigate();
   const groups = useAppStore((s) => s.groups);
+  const currentUser = useAppStore((s) => s.currentUser);
+  const [tab, setTab] = useState<"joined" | "created">("joined");
+
+  const filtered = tab === "created"
+    ? groups.filter((g) => g.ownerUserID === currentUser?.userID)
+    : groups;
 
   return (
     <div className="flex-1 flex flex-col bg-gray-50">
@@ -13,14 +20,28 @@ export default function GroupList() {
         <h2 className="text-base font-semibold text-gray-800">群组列表</h2>
         <button onClick={() => navigate("/contact/create-group")} className="ml-auto text-primary-500 hover:text-primary-600"><Plus size={20} /></button>
       </div>
+      <div className="flex bg-white border-b border-gray-100">
+        <button
+          onClick={() => setTab("joined")}
+          className={`flex-1 py-2.5 text-sm font-medium transition-colors ${tab === "joined" ? "text-primary-600 border-b-2 border-primary-500" : "text-gray-400"}`}
+        >
+          已加入
+        </button>
+        <button
+          onClick={() => setTab("created")}
+          className={`flex-1 py-2.5 text-sm font-medium transition-colors ${tab === "created" ? "text-primary-600 border-b-2 border-primary-500" : "text-gray-400"}`}
+        >
+          我创建的
+        </button>
+      </div>
       <div className="flex-1 overflow-y-auto">
-        {groups.length === 0 && (
+        {filtered.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 text-gray-300 text-sm gap-2">
             <Users size={28} className="opacity-30" />
             <span>暂无群组</span>
           </div>
         )}
-        {groups.map((g) => (
+        {filtered.map((g) => (
           <button key={g.groupID} onClick={() => navigate(`/contact/group/${g.groupID}`)}
             className="w-full flex items-center gap-3 px-5 py-3 bg-white hover:bg-gray-50 border-b border-gray-50 transition-colors">
             <img src={g.faceURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${g.groupID}`} alt="" className="w-12 h-12 rounded-xl object-cover bg-gray-100" />

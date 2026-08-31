@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Phone, Video, MessageSquare, QrCode, Tag, Ban, UserMinus } from "lucide-react";
+import { ArrowLeft, Phone, Video, MessageSquare, QrCode, Tag, Ban, UserMinus, Copy } from "lucide-react";
 import { useAppStore } from "../../store/app-store";
 import { useState, useEffect } from "react";
 
@@ -13,6 +13,7 @@ export default function UserProfile() {
   const setFriendRemark = useAppStore((s) => s.setFriendRemark);
   const deleteFriend = useAppStore((s) => s.deleteFriend);
   const addBlack = useAppStore((s) => s.addBlack);
+  const removeBlack = useAppStore((s) => s.removeBlack);
   const blackList = useAppStore((s) => s.blackList);
   const onlineStatus = useAppStore((s) => s.onlineStatus);
   const loadOnlineStatus = useAppStore((s) => s.loadOnlineStatus);
@@ -21,6 +22,8 @@ export default function UserProfile() {
   const [showRemark, setShowRemark] = useState(false);
   const [remarkText, setRemarkText] = useState("");
   const [showDelete, setShowDelete] = useState(false);
+  const [showBlackConfirm, setShowBlackConfirm] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (id) loadOnlineStatus([id]);
@@ -56,6 +59,20 @@ export default function UserProfile() {
 
   const handleAddBlack = async () => {
     if (id) await addBlack(id);
+    setShowBlackConfirm(false);
+  };
+
+  const handleRemoveBlack = async () => {
+    if (id) await removeBlack(id);
+    setShowBlackConfirm(false);
+  };
+
+  const handleCopyID = () => {
+    if (id) {
+      navigator.clipboard.writeText(id);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   return (
@@ -115,7 +132,7 @@ export default function UserProfile() {
               <span className="text-sm text-gray-600">设置备注和标签</span>
             </button>
           )}
-          <button onClick={handleAddBlack} className="w-full px-6 py-3.5 flex items-center gap-3 hover:bg-gray-50 transition-colors border-b border-gray-50">
+          <button onClick={() => setShowBlackConfirm(true)} className="w-full px-6 py-3.5 flex items-center gap-3 hover:bg-gray-50 transition-colors border-b border-gray-50">
             <Ban size={18} className="text-gray-400" />
             <span className="text-sm text-gray-600">{isBlacklisted ? "移出黑名单" : "加入黑名单"}</span>
           </button>
@@ -125,6 +142,19 @@ export default function UserProfile() {
               <span className="text-sm text-red-500">删除好友</span>
             </button>
           )}
+        </div>
+      )}
+
+      {showBlackConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setShowBlackConfirm(false)}>
+          <div className="bg-white rounded-2xl p-6 w-72 flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-base font-semibold text-gray-800">{isBlacklisted ? "移出黑名单" : "加入黑名单"}</h3>
+            <p className="text-sm text-gray-500">{isBlacklisted ? "确定将该用户移出黑名单？" : "确定将该用户加入黑名单？"}</p>
+            <div className="flex gap-3 justify-end">
+              <button onClick={() => setShowBlackConfirm(false)} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">取消</button>
+              <button onClick={isBlacklisted ? handleRemoveBlack : handleAddBlack} className="px-4 py-2 text-sm bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors">确定</button>
+            </div>
+          </div>
         </div>
       )}
 

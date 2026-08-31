@@ -18,6 +18,7 @@ import Settings from "../settings/Settings";
 import ProfileEdit from "../settings/ProfileEdit";
 import GeneralSettings from "../settings/GeneralSettings";
 import PrivacySettings from "../settings/PrivacySettings";
+import Blacklist from "../settings/Blacklist";
 import ChangePassword from "../settings/ChangePassword";
 import AboutUs from "../settings/AboutUs";
 import CallOverlay from "../call/CallOverlay";
@@ -89,6 +90,7 @@ export default function MainLayout() {
           <Route path="profile" element={<ProfileEdit />} />
           <Route path="general" element={<GeneralSettings />} />
           <Route path="privacy" element={<PrivacySettings />} />
+          <Route path="blacklist" element={<Blacklist />} />
           <Route path="change-password" element={<ChangePassword />} />
           <Route path="about" element={<AboutUs />} />
         </Route>

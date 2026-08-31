@@ -17,6 +17,7 @@ export default function FriendRequests() {
   const [shareUserID, setShareUserID] = useState("");
   const [addUserID, setAddUserID] = useState("");
   const [addSuccess, setAddSuccess] = useState(false);
+  const [tab, setTab] = useState<"pending" | "handled">("pending");
 
   const addFriend = useAppStore((s) => s.addFriend);
   const [refreshing, setRefreshing] = useState(false);
@@ -52,6 +53,10 @@ export default function FriendRequests() {
     }
   };
 
+  const pendingRequests = requests.filter((r: any) => r.handleResult === ApplicationHandleResult.Unprocessed);
+  const handledRequests = requests.filter((r: any) => r.handleResult !== ApplicationHandleResult.Unprocessed);
+  const visibleRequests = tab === "pending" ? pendingRequests : handledRequests;
+
   return (
     <div className="flex-1 flex flex-col bg-gray-50">
       <div className="bg-white px-5 py-4 border-b border-gray-100 flex items-center gap-3">
@@ -76,18 +81,34 @@ export default function FriendRequests() {
         </button>
       </div>
 
+      {/* Tabs */}
+      <div className="flex bg-white border-b border-gray-100">
+        <button
+          onClick={() => setTab("pending")}
+          className={`flex-1 py-2.5 text-sm font-medium transition-colors ${tab === "pending" ? "text-primary-600 border-b-2 border-primary-500" : "text-gray-400"}`}
+        >
+          待处理{pendingRequests.length > 0 ? `（${pendingRequests.length}）` : ""}
+        </button>
+        <button
+          onClick={() => setTab("handled")}
+          className={`flex-1 py-2.5 text-sm font-medium transition-colors ${tab === "handled" ? "text-primary-600 border-b-2 border-primary-500" : "text-gray-400"}`}
+        >
+          已处理
+        </button>
+      </div>
+
       {/* Requests list */}
       <div className="flex-1 overflow-y-auto">
         <div className="px-5 py-3">
           <p className="text-xs text-gray-400 font-medium">好友申请</p>
         </div>
-        {requests.length === 0 && (
+        {visibleRequests.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 text-gray-300 text-sm gap-2">
             <Check size={28} className="opacity-30" />
-            <span>暂无好友申请</span>
+            <span>{tab === "pending" ? "暂无待处理申请" : "暂无已处理申请"}</span>
           </div>
         )}
-        {requests.map((r: any) => (
+        {visibleRequests.map((r: any) => (
           <div key={`${r.fromUserID}-${r.createTime}`} className="bg-white px-5 py-4 border-b border-gray-50 flex items-center gap-3">
             <img src={r.fromFaceURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${r.fromUserID}`} alt="" className="w-12 h-12 rounded-xl object-cover bg-gray-100" />
             <div className="flex-1">

@@ -1,9 +1,8 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useEffect } from "react";
-import { ArrowLeft, Users, Volume2, LogOut, Crown, Shield, QrCode, Settings as SettingsIcon } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ArrowLeft, Users, Volume2, LogOut, Crown, Shield, QrCode, Settings as SettingsIcon, Edit3, Trash2, Flag, X } from "lucide-react";
 import { useAppStore } from "../../store/app-store";
 import { GroupMemberRole } from "@openim/wasm-client-sdk";
-import { useState } from "react";
 
 export default function GroupDetail() {
   const { id } = useParams();
@@ -12,7 +11,14 @@ export default function GroupDetail() {
   const members = useAppStore((s) => (id ? s.groupMembersMap[id] : undefined)) || [];
   const loadMembers = useAppStore((s) => s.loadGroupMembers);
   const currentUser = useAppStore((s) => s.currentUser);
+  const deleteConversation = useAppStore((s) => s.deleteConversation);
+  const setGroupMemberNickname = useAppStore((s) => s.setGroupMemberNickname);
+
   const [showQR, setShowQR] = useState(false);
+  const [showNickname, setShowNickname] = useState(false);
+  const [nickInput, setNickInput] = useState("");
+  const [showReport, setShowReport] = useState(false);
+  const [reportReason, setReportReason] = useState("");
 
   const group = groups.find((g) => g.groupID === id);
 
@@ -23,6 +29,31 @@ export default function GroupDetail() {
   if (!group) return <div className="flex-1 flex items-center justify-center text-gray-300">群组不存在</div>;
 
   const sorted = [...members].sort((a, b) => (b.roleLevel || 0) - (a.roleLevel || 0));
+  const myMember = members.find((m) => m.userID === currentUser?.userID);
+  const conversationID = `sg_${group.groupID}`;
+
+  const handleSaveNickname = async () => {
+    if (!currentUser || !id || !nickInput.trim()) return;
+    await setGroupMemberNickname(id, currentUser.userID, nickInput.trim());
+    setShowNickname(false);
+    setNickInput("");
+  };
+
+  const handleClearMessages = async () => {
+    await deleteConversation(conversationID);
+  };
+
+  const handleReport = () => {
+    if (!reportReason.trim()) return;
+    try {
+      const raw = localStorage.getItem("99chat_reports");
+      const reports = raw ? JSON.parse(raw) : [];
+      reports.push({ groupID: group.groupID, reason: reportReason.trim(), time: Date.now() });
+      localStorage.setItem("99chat_reports", JSON.stringify(reports));
+    } catch {}
+    setShowReport(false);
+    setReportReason("");
+  };
 
   return (
     <div className="flex-1 flex flex-col bg-gray-50">
@@ -76,7 +107,13 @@ export default function GroupDetail() {
 
         <div className="mt-2 bg-white border-y border-gray-50">
           <button onClick={() => navigate(`/messages/groups/admin/${group.groupID}`)} className="w-full px-6 py-3.5 text-left text-sm text-gray-500 hover:text-gray-700 flex items-center gap-2"><SettingsIcon size={16} /> 群管理</button>
+          <button onClick={() => { setNickInput(myMember?.nickname || ""); setShowNickname(true); }} className="w-full px-6 py-3.5 text-left text-sm text-gray-500 hover:text-gray-700 flex items-center justify-between">
+            <span className="flex items-center gap-2"><Edit3 size={16} /> 我的群昵称</span>
+            <span className="text-xs text-gray-400">{myMember?.nickname || currentUser?.nickname || "未设置"}</span>
+          </button>
           <button className="w-full px-6 py-3.5 text-left text-sm text-gray-500 hover:text-gray-700 flex items-center gap-2"><Volume2 size={16} /> 消息免打扰</button>
+          <button onClick={handleClearMessages} className="w-full px-6 py-3.5 text-left text-sm text-gray-500 hover:text-gray-700 flex items-center gap-2"><Trash2 size={16} /> 清空聊天记录</button>
+          <button onClick={() => setShowReport(true)} className="w-full px-6 py-3.5 text-left text-sm text-gray-500 hover:text-gray-700 flex items-center gap-2"><Flag size={16} /> 举报</button>
           {group.ownerUserID === currentUser?.userID ? (
             <button className="w-full px-6 py-3.5 text-left text-sm text-red-400 hover:text-red-500 flex items-center gap-2"><LogOut size={16} /> 解散群组</button>
           ) : (
@@ -85,6 +122,7 @@ export default function GroupDetail() {
         </div>
       </div>
 
+      {/* QR modal */}
       {showQR && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setShowQR(false)}>
           <div className="bg-white rounded-2xl p-8 flex flex-col items-center gap-4" onClick={(e) => e.stopPropagation()}>
@@ -94,6 +132,53 @@ export default function GroupDetail() {
             </div>
             <p className="text-sm text-gray-400">扫描二维码加入群组</p>
             <button onClick={() => setShowQR(false)} className="px-6 py-2 bg-primary-500 text-white rounded-xl text-sm hover:bg-primary-600 transition-colors">关闭</button>
+          </div>
+        </div>
+      )}
+
+      {/* Nickname modal */}
+      {showNickname && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setShowNickname(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-80 max-w-[90%] p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-base font-semibold text-gray-800">我的群昵称</h3>
+              <button onClick={() => setShowNickname(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+            </div>
+            <input
+              value={nickInput}
+              onChange={(e) => setNickInput(e.target.value)}
+              placeholder="输入群昵称"
+              className="w-full px-3 py-2 bg-gray-50 rounded-lg text-sm outline-none focus:bg-white focus:ring-1 focus:ring-primary-200"
+              autoFocus
+            />
+            <div className="flex gap-2 mt-4">
+              <button onClick={() => setShowNickname(false)} className="flex-1 py-2 bg-gray-100 text-gray-500 rounded-lg text-sm hover:bg-gray-200 transition-colors">取消</button>
+              <button onClick={handleSaveNickname} disabled={!nickInput.trim()} className={`flex-1 py-2 rounded-lg text-sm transition-colors ${nickInput.trim() ? "bg-primary-500 text-white hover:bg-primary-600" : "bg-gray-100 text-gray-300"}`}>保存</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Report modal */}
+      {showReport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setShowReport(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-80 max-w-[90%] p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-base font-semibold text-gray-800">举报群组</h3>
+              <button onClick={() => setShowReport(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+            </div>
+            <textarea
+              value={reportReason}
+              onChange={(e) => setReportReason(e.target.value)}
+              placeholder="请输入举报原因"
+              rows={4}
+              className="w-full px-3 py-2 bg-gray-50 rounded-lg text-sm outline-none focus:bg-white focus:ring-1 focus:ring-primary-200 resize-none"
+              autoFocus
+            />
+            <div className="flex gap-2 mt-4">
+              <button onClick={() => setShowReport(false)} className="flex-1 py-2 bg-gray-100 text-gray-500 rounded-lg text-sm hover:bg-gray-200 transition-colors">取消</button>
+              <button onClick={handleReport} disabled={!reportReason.trim()} className={`flex-1 py-2 rounded-lg text-sm transition-colors ${reportReason.trim() ? "bg-red-500 text-white hover:bg-red-600" : "bg-gray-100 text-gray-300"}`}>提交举报</button>
+            </div>
           </div>
         </div>
       )}
