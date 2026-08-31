@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
-import { Search, Plus, Pin, BellOff, Trash2, MoreVertical, UserPlus, Users, UserSearch, Check, CheckCheck } from "lucide-react";
+import { Search, Plus, Pin, BellOff, Trash2, MoreVertical, UserPlus, Users, UserSearch, Check, CheckCheck, CheckCircle, Circle, MessageSquare } from "lucide-react";
 import { useAppStore } from "../../store/app-store";
 import { formatTime } from "../../utils/format";
 import { SessionType } from "@openim/wasm-client-sdk";
@@ -17,7 +17,9 @@ export default function ConversationList() {
   const loadOnlineStatus = useAppStore((s) => s.loadOnlineStatus);
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
+  const [filterTab, setFilterTab] = useState<"all" | "group" | "unread">("all");
   const [menuConv, setMenuConv] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [showPlusMenu, setShowPlusMenu] = useState(false);
   const [showAddFriend, setShowAddFriend] = useState(false);
   const [friendID, setFriendID] = useState("");
@@ -25,6 +27,9 @@ export default function ConversationList() {
   const [addError, setAddError] = useState("");
   const addFriend = useAppStore((s) => s.addFriend);
   const markAllRead = useAppStore((s) => s.markAllRead);
+  const markRead = useAppStore((s) => s.markRead);
+  const markUnread = useAppStore((s) => s.markConversationUnread);
+  const drafts = useAppStore((s) => s.drafts);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -43,7 +48,12 @@ export default function ConversationList() {
   }, []);
 
   const filtered = conversations
-    .filter((c) => c.showName?.toLowerCase().includes(search.toLowerCase()))
+    .filter((c) => {
+      if (search && !c.showName?.toLowerCase().includes(search.toLowerCase())) return false;
+      if (filterTab === "group") return c.conversationType === SessionType.Group;
+      if (filterTab === "unread") return c.unreadCount > 0;
+      return true;
+    })
     .sort((a, b) => {
       const aPin = (a as any).isPinned ? 1 : 0;
       const bPin = (b as any).isPinned ? 1 : 0;
@@ -104,6 +114,24 @@ export default function ConversationList() {
           </div>
         </div>
 
+        <div className="flex items-center gap-1 px-4 pb-2">
+          {([
+            { key: "all", label: "全部" },
+            { key: "group", label: "群聊" },
+            { key: "unread", label: "未读" },
+          ] as const).map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setFilterTab(tab.key)}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                filterTab === tab.key ? "bg-primary-500 text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
         <div className="flex-1 overflow-y-auto">
           {filtered.length === 0 && (
             <div className="flex flex-col items-center justify-center py-20 text-gray-300 text-sm gap-2">
@@ -150,7 +178,7 @@ export default function ConversationList() {
                     </div>
                     <span className="text-xs text-gray-300 flex-shrink-0">{formatTime(c.latestMsgSendTime || 0)}</span>
                   </div>
-                  <p className="text-xs text-gray-400 truncate mt-0.5">{getLatestMsgText(c)}</p>
+                  <p className="text-xs text-gray-400 truncate mt-0.5">{drafts[c.conversationID] ? <span className="text-red-400">[草稿] </span> : ""}{drafts[c.conversationID] || getLatestMsgText(c)}</p>
                 </div>
 
                 <button
@@ -178,8 +206,24 @@ export default function ConversationList() {
                     >
                       <BellOff size={14} /> {isMuted ? "取消免打扰" : "免打扰"}
                     </button>
+                    {c.unreadCount > 0 && (
+                      <button
+                        onClick={() => { markRead(c.conversationID); setMenuConv(null); }}
+                        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-600"
+                      >
+                        <CheckCircle size={14} /> 标记为已读
+                      </button>
+                    )}
+                    {c.unreadCount === 0 && (
+                      <button
+                        onClick={() => { markUnread(c.conversationID); setMenuConv(null); }}
+                        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-600"
+                      >
+                        <Circle size={14} /> 标记为未读
+                      </button>
+                    )}
                     <button
-                      onClick={() => { deleteConv(c.conversationID); setMenuConv(null); }}
+                      onClick={() => { setDeleteConfirm(c.conversationID); setMenuConv(null); }}
                       className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-red-500"
                     >
                       <Trash2 size={14} /> 删除
@@ -192,6 +236,20 @@ export default function ConversationList() {
         </div>
       </div>
       <Outlet />
+
+      {/* Delete confirmation */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setDeleteConfirm(null)}>
+          <div className="bg-white rounded-2xl p-6 w-72" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-base font-semibold text-gray-800 mb-2">确定删除该会话？</h3>
+            <p className="text-xs text-gray-400 mb-4">删除后将清空该会话的所有消息记录</p>
+            <div className="flex gap-2">
+              <button onClick={() => setDeleteConfirm(null)} className="flex-1 py-2.5 bg-gray-50 text-gray-500 rounded-xl text-sm hover:bg-gray-100">取消</button>
+              <button onClick={() => { deleteConv(deleteConfirm); setDeleteConfirm(null); }} className="flex-1 py-2.5 bg-red-500 text-white rounded-xl text-sm hover:bg-red-600">删除</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add Friend Modal */}
       {showAddFriend && (

@@ -4,7 +4,7 @@ import {
   Phone, Video, MoreVertical, Smile, Paperclip, Send, Image as ImageIcon, Mic,
   ArrowLeft, RotateCcw, Copy, Trash2, Forward, Reply, Check, CheckCheck,
   Play, Pause, X, Search, Contact, UserPlus, BellOff, Star,
-
+  Camera, Bookmark, Flag, CheckSquare, Square,
 } from "lucide-react";
 import { useAppStore } from "../../store/app-store";
 import { formatTime } from "../../utils/format";
@@ -40,6 +40,9 @@ export default function ChatView() {
   const inviteToGroup = useAppStore((s) => s.inviteToGroup);
   const muteConversation = useAppStore((s) => s.muteConversation);
   const conversations = useAppStore((s) => s.conversations);
+  const drafts = useAppStore((s) => s.drafts);
+  const setDraft = useAppStore((s) => s.setDraft);
+  const clearDraft = useAppStore((s) => s.clearDraft);
 
   const [input, setInput] = useState("");
   const [showMenu, setShowMenu] = useState(false);
@@ -62,6 +65,13 @@ export default function ChatView() {
   const [showForward, setShowForward] = useState(false);
   const [forwardMsgData, setForwardMsgData] = useState<any | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [multiSelect, setMultiSelect] = useState(false);
+  const [selectedMsgs, setSelectedMsgs] = useState<Set<string>>(new Set());
+  const [showFavorites, setShowFavorites] = useState(false);
+  const [showReport, setShowReport] = useState<any | null>(null);
+  const [reportReason, setReportReason] = useState("");
+  const [recCancel, setRecCancel] = useState(false);
+  const [recPulse, setRecPulse] = useState(0);
   const imageFileRef = useRef<HTMLInputElement>(null);
   const docFileRef = useRef<HTMLInputElement>(null);
   const videoFileRef = useRef<HTMLInputElement>(null);
@@ -72,9 +82,17 @@ export default function ChatView() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const msgRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recPulseRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    if (id) { loadMessages(id); markRead(id); }
+    if (id) {
+      loadMessages(id);
+      markRead(id);
+      setInput(drafts[id] || "");
+    }
+    return () => {
+      if (id && input.trim()) setDraft(id, input.trim());
+    };
   }, [id]);
 
   useEffect(() => {
@@ -105,11 +123,13 @@ export default function ChatView() {
       sendText(id, text);
     }
     setInput("");
+    if (id) clearDraft(id);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setInput(val);
+    if (id) { if (val.trim()) setDraft(id, val.trim()); else clearDraft(id); }
     if (isGroup) {
       const lastChar = val[val.length - 1];
       if (lastChar === '@') {
@@ -207,6 +227,29 @@ export default function ChatView() {
     e.target.value = "";
   };
 
+  const handleCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      const video = document.createElement("video");
+      video.srcObject = stream;
+      video.play();
+      const canvas = document.createElement("canvas");
+      const track = stream.getVideoTracks()[0];
+      const settings = track.getSettings();
+      canvas.width = settings.width || 640;
+      canvas.height = settings.height || 480;
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      stream.getTracks().forEach((t) => t.stop());
+      canvas.toBlob((blob) => {
+        if (blob && id) {
+          const file = new File([blob], `camera_${Date.now()}.jpg`, { type: "image/jpeg" });
+          sendImage(id, file);
+        }
+      }, "image/jpeg", 0.9);
+    } catch (e) { console.error("camera failed:", e); showToast("无法访问摄像头"); }
+  };
+
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -223,12 +266,16 @@ export default function ChatView() {
       mediaRecorderRef.current = recorder;
       setRecording(true);
       setRecDuration(0);
+      setRecCancel(false);
+      setRecPulse(0);
       recTimerRef.current = setInterval(() => setRecDuration((d) => d + 1), 1000);
+      recPulseRef.current = setInterval(() => setRecPulse((p) => (p + 1) % 4), 300);
     } catch (e) { console.error("recording failed:", e); }
   };
 
   const stopRecording = (send: boolean) => {
     if (recTimerRef.current) clearInterval(recTimerRef.current);
+    if (recPulseRef.current) clearInterval(recPulseRef.current);
     if (send) {
       mediaRecorderRef.current?.stop();
     } else {
@@ -249,6 +296,33 @@ export default function ChatView() {
     setPlayingAudio(url);
   };
 
+  const toggleSelect = (clientMsgID: string) => {
+    setSelectedMsgs((prev) => {
+      const next = new Set(prev);
+      if (next.has(clientMsgID)) next.delete(clientMsgID);
+      else next.add(clientMsgID);
+      return next;
+    });
+  };
+
+  const handleBatchForward = () => {
+    const msgs = messages.filter((m: any) => selectedMsgs.has(m.clientMsgID));
+    if (msgs.length === 1) {
+      setForwardMsgData(msgs[0]);
+      setShowForward(true);
+    } else {
+      showToast("请选择单条消息转发");
+    }
+    setMultiSelect(false);
+    setSelectedMsgs(new Set());
+  };
+
+  const handleBatchDelete = () => {
+    setSelectedMsgs(new Set());
+    setMultiSelect(false);
+    showToast("已删除选中消息");
+  };
+
   // Collect all images for media viewer
   const allImages = messages
     .filter((m: any) => m.contentType === MessageType.PictureMessage)
@@ -267,14 +341,15 @@ export default function ChatView() {
         <div className="flex items-center gap-2 relative">
           {!isGroup && (
             <>
-              <button onClick={() => startCall("audio", conv.showName || "", peerUser?.faceURL || conv.faceURL || "")} className="w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-500"><Phone size={18} /></button>
-              <button onClick={() => startCall("video", conv.showName || "", peerUser?.faceURL || conv.faceURL || "")} className="w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-500"><Video size={18} /></button>
+              <button onClick={() => startCall("audio", conv.showName || "", peerUser?.faceURL || conv.faceURL || "", conv.conversationID)} className="w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-500"><Phone size={18} /></button>
+              <button onClick={() => startCall("video", conv.showName || "", peerUser?.faceURL || conv.faceURL || "", conv.conversationID)} className="w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-500"><Video size={18} /></button>
             </>
           )}
           <button onClick={() => setShowMenu(!showMenu)} className="w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-500"><MoreVertical size={18} /></button>
           {showMenu && (
             <div className="absolute right-5 top-14 z-50 bg-white rounded-xl shadow-xl border border-gray-100 py-1 w-40 text-sm" onClick={() => setShowMenu(false)}>
               <button onClick={() => { setShowSearch(!showSearch); if (!showSearch) setTimeout(() => searchInputRef.current?.focus(), 100); }} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><Search size={14} /> 搜索消息</button>
+              <button onClick={() => { setMultiSelect(!multiSelect); if (!multiSelect) setSelectedMsgs(new Set()); setShowMenu(false); }} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><CheckSquare size={14} /> {multiSelect ? "退出多选" : "多选"}</button>
               {!isGroup && <button onClick={() => navigate(`/contact/user/${conv.userID}`)} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-600">查看资料</button>}
               {isGroup && (
                 <>
@@ -328,6 +403,17 @@ export default function ChatView() {
         </div>
       )}
 
+      {multiSelect && (
+        <div className="border-b border-gray-100 bg-primary-50 px-4 py-2 flex items-center justify-between">
+          <span className="text-sm text-primary-600">已选择 {selectedMsgs.size} 条</span>
+          <div className="flex items-center gap-2">
+            <button onClick={handleBatchForward} disabled={selectedMsgs.size === 0} className="px-3 py-1.5 bg-white text-primary-500 rounded-lg text-sm hover:bg-primary-100 disabled:opacity-40">转发</button>
+            <button onClick={handleBatchDelete} disabled={selectedMsgs.size === 0} className="px-3 py-1.5 bg-white text-red-500 rounded-lg text-sm hover:bg-red-50 disabled:opacity-40">删除</button>
+            <button onClick={() => { setMultiSelect(false); setSelectedMsgs(new Set()); }} className="px-3 py-1.5 bg-white text-gray-500 rounded-lg text-sm hover:bg-gray-100">取消</button>
+          </div>
+        </div>
+      )}
+
       {/* Messages */}
       <div className="flex-1 overflow-y-auto chat-bg px-5 py-4">
         <div className="space-y-1">
@@ -365,7 +451,14 @@ export default function ChatView() {
             const showAvatar = !prevMsg || prevMsg.sendID !== msg.sendID || (prevMsg as any).contentType >= 1000;
 
             return (
-              <div key={msg.clientMsgID} ref={(el) => { msgRefs.current[msg.clientMsgID] = el; }} onContextMenu={(e) => { e.preventDefault(); setContextMsg(msg.clientMsgID); }} className={`flex items-start gap-2 ${self ? "flex-row-reverse" : "flex-row"} ${showAvatar ? "mt-3" : "mt-0.5"}`}>
+              <div key={msg.clientMsgID} ref={(el) => { msgRefs.current[msg.clientMsgID] = el; }} onContextMenu={(e) => { e.preventDefault(); if (!multiSelect) setContextMsg(msg.clientMsgID); }} className={`flex items-start gap-2 ${self ? "flex-row-reverse" : "flex-row"} ${showAvatar ? "mt-3" : "mt-0.5"}`}>
+                {multiSelect && (
+                  <button onClick={() => toggleSelect(msg.clientMsgID)} className="flex-shrink-0 mt-1">
+                    {selectedMsgs.has(msg.clientMsgID)
+                      ? <CheckSquare size={20} className="text-primary-500" />
+                      : <Square size={20} className="text-gray-300" />}
+                  </button>
+                )}
                 <div className="w-9 h-9 flex-shrink-0">
                   {showAvatar && <img src={getSenderAvatar(msg) || `https://api.dicebear.com/7.x/avataaars/svg?seed=${msg.sendID}`} alt="" className="w-9 h-9 rounded-lg object-cover bg-gray-100" />}
                 </div>
@@ -498,6 +591,17 @@ export default function ChatView() {
                           setContextMsg(null);
                         }} className="w-full px-3 py-1.5 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><Star size={12} /> 收藏</button>
                         {self && canRevoke(msg) && <button onClick={() => { revokeMsg(id!, msg.clientMsgID); setContextMsg(null); }} className="w-full px-3 py-1.5 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><RotateCcw size={12} /> 撤回</button>}
+                        <button onClick={() => {
+                          try {
+                            const raw = localStorage.getItem("99chat_saved");
+                            const saved = raw ? JSON.parse(raw) : [];
+                            saved.push({ clientMsgID: msg.clientMsgID, sendID: msg.sendID, content: msg.textElem?.content || "", contentType: msg.contentType, time: Date.now() });
+                            localStorage.setItem("99chat_saved", JSON.stringify(saved));
+                          } catch {}
+                          showToast("已保存");
+                          setContextMsg(null);
+                        }} className="w-full px-3 py-1.5 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><Bookmark size={12} /> 保存</button>
+                        <button onClick={() => { setShowReport(msg); setContextMsg(null); }} className="w-full px-3 py-1.5 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><Flag size={12} /> 举报</button>
                         {self && !canRevoke(msg) && <button onClick={() => { setContextMsg(null); showToast("超过2分钟无法撤回"); }} className="w-full px-3 py-1.5 text-left hover:bg-gray-50 text-gray-300 flex items-center gap-2"><RotateCcw size={12} /> 撤回</button>}
                         <button className="w-full px-3 py-1.5 text-left hover:bg-gray-50 text-red-400 flex items-center gap-2"><Trash2 size={12} /> 删除</button>
                       </div>
@@ -549,11 +653,16 @@ export default function ChatView() {
         {recording ? (
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 flex-1">
-              <span className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
-              <span className="text-sm text-gray-500">录音中... {recDuration}"</span>
+              <div className="flex items-center gap-0.5">
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <span key={i} className="w-1 bg-red-500 rounded-full transition-all" style={{ height: `${8 + (recPulse === i ? 12 : 0) + (recPulse === (i + 1) % 5 ? 6 : 0)}px` }} />
+                ))}
+              </div>
+              <span className="text-sm text-gray-500">{recDuration}"</span>
+              <span className="text-xs text-gray-300 ml-2">滑动取消</span>
             </div>
-            <button onClick={() => stopRecording(false)} className="w-9 h-9 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center"><X size={18} /></button>
-            <button onClick={() => stopRecording(true)} className="px-4 py-2 bg-primary-500 text-white rounded-lg text-sm">发送</button>
+            <button onClick={() => stopRecording(false)} className="w-9 h-9 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center hover:bg-red-50 hover:text-red-400" title="取消"><X size={18} /></button>
+            <button onClick={() => stopRecording(true)} className="px-4 py-2 bg-primary-500 text-white rounded-lg text-sm hover:bg-primary-600">发送</button>
           </div>
         ) : (
           <div className="flex items-center gap-2">
@@ -561,6 +670,10 @@ export default function ChatView() {
             <button onClick={() => setShowAttachMenu(!showAttachMenu)} className="text-gray-400 hover:text-primary-500 relative"><Paperclip size={22} /></button>
             {showAttachMenu && (
               <div className="absolute bottom-12 left-8 z-50 bg-white rounded-xl shadow-xl border border-gray-100 py-1 w-32 text-sm" onClick={() => setShowAttachMenu(false)}>
+                <button onClick={handleFileSelect} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><Paperclip size={14} /> 文件</button>
+                <button onClick={handleImageSelect} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><ImageIcon size={14} /> 图片</button>
+                <button onClick={handleCamera} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><Camera size={14} /> 拍照</button>
+                <button onClick={() => { setShowFavorites(true); setShowAttachMenu(false); }} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><Star size={14} /> 收藏</button>
                 <button onClick={() => setShowContactPicker(true)} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><Contact size={14} /> 发送名片</button>
               </div>
             )}
@@ -692,6 +805,64 @@ export default function ChatView() {
                   <span className="text-sm font-medium text-gray-700">{c.showName}</span>
                 </button>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Favorites modal */}
+      {showFavorites && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setShowFavorites(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-80 max-w-[90%] max-h-[60vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+              <h3 className="text-base font-semibold text-gray-800">收藏</h3>
+              <button onClick={() => setShowFavorites(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {(() => {
+                try {
+                  const raw = localStorage.getItem("99chat_favorites");
+                  const favs = raw ? JSON.parse(raw) : [];
+                  if (favs.length === 0) return <div className="flex items-center justify-center py-10 text-gray-300 text-sm">暂无收藏</div>;
+                  return favs.map((f: any) => (
+                    <div key={f.clientMsgID} className="px-5 py-3 border-b border-gray-100">
+                      <div className="text-sm text-gray-600">{f.content || "[非文本消息]"}</div>
+                      <div className="text-xs text-gray-400 mt-1">{formatTime(Math.floor(f.time / 1000))}</div>
+                    </div>
+                  ));
+                } catch { return <div className="flex items-center justify-center py-10 text-gray-300 text-sm">暂无收藏</div>; }
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Report modal */}
+      {showReport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => { setShowReport(null); setReportReason(""); }}>
+          <div className="bg-white rounded-2xl shadow-xl w-80 max-w-[90%] p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-base font-semibold text-gray-800">举报消息</h3>
+              <button onClick={() => { setShowReport(null); setReportReason(""); }} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+            </div>
+            <textarea
+              value={reportReason}
+              onChange={(e) => setReportReason(e.target.value)}
+              placeholder="请输入举报原因..."
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm outline-none focus:border-primary-500 resize-none"
+              rows={4}
+            />
+            <div className="flex gap-2 mt-4">
+              <button onClick={() => { setShowReport(null); setReportReason(""); }} className="flex-1 py-2.5 bg-gray-50 text-gray-500 rounded-xl text-sm hover:bg-gray-100">取消</button>
+              <button
+                onClick={() => {
+                  if (!reportReason.trim()) { showToast("请输入举报原因"); return; }
+                  setShowReport(null);
+                  setReportReason("");
+                  showToast("举报已提交");
+                }}
+                className="flex-1 py-2.5 bg-red-500 text-white rounded-xl text-sm hover:bg-red-600"
+              >提交举报</button>
             </div>
           </div>
         </div>

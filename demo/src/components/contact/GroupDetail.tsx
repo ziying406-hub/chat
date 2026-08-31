@@ -1,7 +1,8 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
-import { ArrowLeft, Users, Volume2, LogOut, Crown, Shield, QrCode, Settings as SettingsIcon, Edit3, Trash2, Flag, X } from "lucide-react";
+import { useEffect, useState, useRef } from "react";
+import { ArrowLeft, Users, Volume2, LogOut, Crown, Shield, QrCode, Settings as SettingsIcon, Edit3, Trash2, Flag, X, Camera, ChevronDown } from "lucide-react";
 import { useAppStore } from "../../store/app-store";
+import { getIMSDK } from "../../services/openim";
 import { GroupMemberRole } from "@openim/wasm-client-sdk";
 
 export default function GroupDetail() {
@@ -13,12 +14,24 @@ export default function GroupDetail() {
   const currentUser = useAppStore((s) => s.currentUser);
   const deleteConversation = useAppStore((s) => s.deleteConversation);
   const setGroupMemberNickname = useAppStore((s) => s.setGroupMemberNickname);
+  const setGroupInfo = useAppStore((s) => s.setGroupInfo);
+  const uploadAvatar = useAppStore((s) => s.uploadAvatar);
+  const dismissGroup = useAppStore((s) => s.dismissGroup);
 
   const [showQR, setShowQR] = useState(false);
   const [showNickname, setShowNickname] = useState(false);
   const [nickInput, setNickInput] = useState("");
   const [showReport, setShowReport] = useState(false);
   const [reportReason, setReportReason] = useState("");
+  const [showConfirmClear, setShowConfirmClear] = useState(false);
+  const [showConfirmQuit, setShowConfirmQuit] = useState(false);
+  const [showJoinMethod, setShowJoinMethod] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const groupEx = (() => { try { return JSON.parse(group?.ex || "{}"); } catch { return {}; } })();
+  const isPublic = groupEx.isPublic ?? false;
+  const needVerification = group?.needVerification ?? 0;
 
   const group = groups.find((g) => g.groupID === id);
 
@@ -41,6 +54,36 @@ export default function GroupDetail() {
 
   const handleClearMessages = async () => {
     await deleteConversation(conversationID);
+    setShowConfirmClear(false);
+  };
+
+  const handleUploadAvatar = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !id) return;
+    const url = await uploadAvatar(file);
+    if (url) await setGroupInfo(id, { faceURL: url });
+  };
+
+  const handleTogglePublic = async (val: boolean) => {
+    if (!id) return;
+    await setGroupInfo(id, { ex: JSON.stringify({ ...groupEx, isPublic: val }) });
+  };
+
+  const handleJoinMethodChange = async (val: number) => {
+    if (!id) return;
+    await setGroupInfo(id, { needVerification: val } as any);
+    setShowJoinMethod(false);
+  };
+
+  const handleQuitGroup = async () => {
+    if (group.ownerUserID === currentUser?.userID) {
+      await dismissGroup(group.groupID);
+    } else {
+      const im = getIMSDK();
+      await im.quitGroup(group.groupID);
+    }
+    setShowConfirmQuit(false);
+    navigate("/contact/groups");
   };
 
   const handleReport = () => {
@@ -65,7 +108,18 @@ export default function GroupDetail() {
 
       <div className="flex-1 overflow-y-auto">
         <div className="bg-white px-6 py-6 flex items-center gap-4 border-b border-gray-50">
-          <img src={group.faceURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${group.groupID}`} alt="" className="w-16 h-16 rounded-2xl object-cover bg-gray-100" />
+          <div className="relative">
+            <img src={group.faceURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${group.groupID}`} alt="" className="w-16 h-16 rounded-2xl object-cover bg-gray-100" />
+            {group.ownerUserID === currentUser?.userID && (
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-primary-500 flex items-center justify-center text-white shadow-sm hover:bg-primary-600 transition-colors"
+              >
+                <Camera size={12} />
+              </button>
+            )}
+            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleUploadAvatar} />
+          </div>
           <div className="flex-1">
             <h3 className="text-lg font-bold text-gray-800">{group.groupName}</h3>
             <p className="text-xs text-gray-400 mt-1">{group.memberCount || members.length} 成员</p>
@@ -81,6 +135,39 @@ export default function GroupDetail() {
           <h4 className="text-sm font-medium text-gray-700 mb-2">群简介</h4>
           <p className="text-sm text-gray-400">{group.introduction || "暂无简介"}</p>
         </div>
+
+        {group.ownerUserID === currentUser?.userID && (
+          <div className="bg-white mt-2 border-y border-gray-50">
+            <div className="px-6 py-3.5 flex items-center justify-between">
+              <span className="text-sm text-gray-500">公开群</span>
+              <button
+                onClick={() => handleTogglePublic(!isPublic)}
+                className={`relative w-11 h-6 rounded-full transition-colors ${isPublic ? "bg-primary-500" : "bg-gray-200"}`}
+              >
+                <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${isPublic ? "translate-x-5" : ""}`} />
+              </button>
+            </div>
+            <div className="relative">
+              <button
+                onClick={() => setShowJoinMethod(!showJoinMethod)}
+                className="w-full px-6 py-3.5 flex items-center justify-between text-sm text-gray-500 hover:text-gray-700 border-t border-gray-50"
+              >
+                <span>入群方式</span>
+                <span className="flex items-center gap-1 text-xs text-gray-400">
+                  {needVerification === 0 ? "无需审批入群" : needVerification === 1 ? "需要审批入群" : "禁止入群"}
+                  <ChevronDown size={14} />
+                </span>
+              </button>
+              {showJoinMethod && (
+                <div className="absolute right-6 top-full mt-1 z-10 bg-white rounded-xl shadow-xl border border-gray-100 py-1 w-40 text-sm" onClick={(e) => e.stopPropagation()}>
+                  <button onClick={() => handleJoinMethodChange(0)} className={`w-full px-4 py-2 text-left hover:bg-gray-50 ${needVerification === 0 ? "text-primary-500 font-medium" : "text-gray-600"}`}>无需审批入群</button>
+                  <button onClick={() => handleJoinMethodChange(1)} className={`w-full px-4 py-2 text-left hover:bg-gray-50 ${needVerification === 1 ? "text-primary-500 font-medium" : "text-gray-600"}`}>需要审批入群</button>
+                  <button onClick={() => handleJoinMethodChange(2)} className={`w-full px-4 py-2 text-left hover:bg-gray-50 ${needVerification === 2 ? "text-primary-500 font-medium" : "text-gray-600"}`}>禁止入群</button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="bg-white mt-2 border-y border-gray-50">
           <div className="px-6 py-3 flex items-center justify-between">
@@ -112,12 +199,12 @@ export default function GroupDetail() {
             <span className="text-xs text-gray-400">{myMember?.nickname || currentUser?.nickname || "未设置"}</span>
           </button>
           <button className="w-full px-6 py-3.5 text-left text-sm text-gray-500 hover:text-gray-700 flex items-center gap-2"><Volume2 size={16} /> 消息免打扰</button>
-          <button onClick={handleClearMessages} className="w-full px-6 py-3.5 text-left text-sm text-gray-500 hover:text-gray-700 flex items-center gap-2"><Trash2 size={16} /> 清空聊天记录</button>
+          <button onClick={() => setShowConfirmClear(true)} className="w-full px-6 py-3.5 text-left text-sm text-gray-500 hover:text-gray-700 flex items-center gap-2"><Trash2 size={16} /> 清空聊天记录</button>
           <button onClick={() => setShowReport(true)} className="w-full px-6 py-3.5 text-left text-sm text-gray-500 hover:text-gray-700 flex items-center gap-2"><Flag size={16} /> 举报</button>
           {group.ownerUserID === currentUser?.userID ? (
-            <button className="w-full px-6 py-3.5 text-left text-sm text-red-400 hover:text-red-500 flex items-center gap-2"><LogOut size={16} /> 解散群组</button>
+            <button onClick={() => setShowConfirmQuit(true)} className="w-full px-6 py-3.5 text-left text-sm text-red-400 hover:text-red-500 flex items-center gap-2"><LogOut size={16} /> 解散群组</button>
           ) : (
-            <button className="w-full px-6 py-3.5 text-left text-sm text-red-400 hover:text-red-500 flex items-center gap-2"><LogOut size={16} /> 退出群组</button>
+            <button onClick={() => setShowConfirmQuit(true)} className="w-full px-6 py-3.5 text-left text-sm text-red-400 hover:text-red-500 flex items-center gap-2"><LogOut size={16} /> 退出群组</button>
           )}
         </div>
       </div>

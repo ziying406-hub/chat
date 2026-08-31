@@ -63,6 +63,7 @@ interface AppState {
   darkMode: boolean;
   onlineStatus: Record<string, boolean>;
   tags: TagItem[];
+  drafts: Record<string, string>;
 
   // Auth
   sendCode: (phone: string, areaCode?: string) => Promise<void>;
@@ -93,6 +94,9 @@ interface AppState {
   sendEmoticonMessage: (conversationID: string, emoji: string) => Promise<void>;
   searchLocalMessages: (conversationID: string, keywordList: string[]) => Promise<any[]>;
   sendContactCard: (conversationID: string, userID: string, nickname: string, faceURL: string) => Promise<void>;
+  setDraft: (conversationID: string, text: string) => void;
+  clearDraft: (conversationID: string) => void;
+  markConversationUnread: (conversationID: string) => void;
 
   // Friends
   addFriend: (userID: string, reqMsg: string) => Promise<void>;
@@ -155,6 +159,7 @@ export const useAppStore = create<AppState>()(
     darkMode: false,
     onlineStatus: {},
     tags: [],
+    drafts: {},
 
     sendCode: async (phone, areaCode = "+86") => {
       try {
@@ -887,6 +892,21 @@ export const useAppStore = create<AppState>()(
       set((s) => {
         s.tags = s.tags.filter((t) => t.tagID !== tagID);
         localStorage.setItem("99chat_tags", JSON.stringify(s.tags));
+      });
+    },
+
+    setDraft: (conversationID, text) => {
+      set((s) => { s.drafts[conversationID] = text; });
+    },
+
+    clearDraft: (conversationID) => {
+      set((s) => { delete s.drafts[conversationID]; });
+    },
+
+    markConversationUnread: (conversationID) => {
+      set((s) => {
+        const conv = s.conversations.find((c) => c.conversationID === conversationID);
+        if (conv && conv.unreadCount === 0) conv.unreadCount = 1;
       });
     },
 
