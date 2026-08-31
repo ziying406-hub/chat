@@ -322,7 +322,7 @@ export const useAppStore = create<AppState>()(
     loadMessages: async (conversationID) => {
       const im = getIMSDK();
       try {
-        const res = await im.getAdvancedHistoryMessageList({ conversationID, startClientMsgID: "", count: 50, lastMinSeq: 0 });
+        const res = await im.getAdvancedHistoryMessageList({ conversationID, startClientMsgID: "", count: 50, viewType: 0 } as any);
         set((s) => { s.messagesMap[conversationID] = (res.data?.messageList || []).reverse(); });
       } catch (e) { console.error("loadMessages:", e); }
     },
