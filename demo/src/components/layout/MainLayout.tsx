@@ -14,6 +14,7 @@ import Settings from "../settings/Settings";
 import ProfileEdit from "../settings/ProfileEdit";
 import GeneralSettings from "../settings/GeneralSettings";
 import PrivacySettings from "../settings/PrivacySettings";
+import ChangePassword from "../settings/ChangePassword";
 import CallOverlay from "../call/CallOverlay";
 import EmptyState from "../chat/EmptyState";
 
@@ -48,7 +49,7 @@ export default function MainLayout() {
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-white">
-      <div className="w-[72px] bg-gray-50 border-r border-gray-100 flex flex-col items-center py-4 gap-2">
+      <div className="w-[72px] bg-gray-50 border-r border-gray-100 flex flex-col items-center py-4 gap-2 sidebar-nav">
         <NavButton icon={<MessageSquare size={22} />} label="消息" path="/messages" active={isActive("/messages")} badge={totalUnread} />
         <NavButton icon={<Users size={22} />} label="通讯录" path="/contact" active={isActive("/contact")} badge={pendingRequests} />
         <div className="flex-1" />
@@ -77,11 +78,18 @@ export default function MainLayout() {
           <Route path="profile" element={<ProfileEdit />} />
           <Route path="general" element={<GeneralSettings />} />
           <Route path="privacy" element={<PrivacySettings />} />
+          <Route path="change-password" element={<ChangePassword />} />
         </Route>
         <Route path="*" element={<Navigate to="/messages" replace />} />
       </Routes>
 
       <CallOverlay />
+
+      <div className="mobile-tabbar">
+        <NavButton icon={<MessageSquare size={22} />} label="消息" path="/messages" active={isActive("/messages")} badge={totalUnread} />
+        <NavButton icon={<Users size={22} />} label="通讯录" path="/contact" active={isActive("/contact")} badge={pendingRequests} />
+        <NavButton icon={<SettingsIcon size={22} />} label="设置" path="/settings" active={isActive("/settings")} />
+      </div>
     </div>
   );
 }

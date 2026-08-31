@@ -41,7 +41,9 @@ interface AppState {
   groupMembersMap: Record<string, GroupMemberItem[]>;
   friendRequests: FriendApplicationItem[];
   groupRequests: any[];
+  blackList: any[];
   totalUnread: number;
+  darkMode: boolean;
 
   // Auth
   sendCode: (phone: string, areaCode?: string) => Promise<void>;
@@ -62,12 +64,19 @@ interface AppState {
   muteConversation: (conversationID: string, opt: number) => Promise<void>;
   deleteConversation: (conversationID: string) => Promise<void>;
   revokeMessage: (conversationID: string, clientMsgID: string) => Promise<void>;
+  sendQuoteMessage: (conversationID: string, text: string, quoteMessage: string) => Promise<void>;
+  sendAtMessage: (conversationID: string, text: string, atUserIDList: string[]) => Promise<void>;
+  searchLocalMessages: (conversationID: string, keywordList: string[]) => Promise<any[]>;
 
   // Friends
   addFriend: (userID: string, reqMsg: string) => Promise<void>;
   acceptFriendRequest: (userID: string) => Promise<void>;
   rejectFriendRequest: (userID: string) => Promise<void>;
   deleteFriend: (userID: string) => Promise<void>;
+  setFriendRemark: (userID: string, remark: string) => Promise<void>;
+  loadBlackList: () => Promise<void>;
+  addBlack: (userID: string) => Promise<void>;
+  removeBlack: (userID: string) => Promise<void>;
 
   // Groups
   createGroup: (name: string, memberUserIDs: string[]) => Promise<void>;
@@ -85,6 +94,8 @@ interface AppState {
   // Profile
   updateSelfInfo: (info: { nickname?: string; faceURL?: string; ex?: string }) => Promise<void>;
   uploadAvatar: (file: File) => Promise<string | null>;
+  toggleDarkMode: () => void;
+  setDarkMode: (val: boolean) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -104,6 +115,8 @@ export const useAppStore = create<AppState>()(
     friendRequests: [],
     groupRequests: [],
     totalUnread: 0,
+    blackList: [],
+    darkMode: false,
 
     sendCode: async (phone, areaCode = "+86") => {
       try {
@@ -196,6 +209,11 @@ export const useAppStore = create<AppState>()(
       try {
         const groupReqRes = await im.getGroupApplicationListAsRecipient();
         set((s) => { s.groupRequests = groupReqRes.data || []; });
+      } catch {}
+
+      try {
+        const blackRes = await im.getBlackList();
+        set((s) => { s.blackList = blackRes.data || []; });
       } catch {}
 
       on(CbEvents.OnConversationChanged, (convs: ConversationItem[]) => {
@@ -408,6 +426,90 @@ export const useAppStore = create<AppState>()(
       } catch (e) { console.error("revoke:", e); }
     },
 
+    sendQuoteMessage: async (conversationID, text, quoteMessage) => {
+      const im = getIMSDK();
+      const state = get();
+      const conv = state.conversations.find((c) => c.conversationID === conversationID);
+      if (!conv) return;
+      const msgRes = await im.createQuoteMessage({ text, message: quoteMessage });
+      const message = msgRes.data;
+      if (!message) return;
+      const params: any = {
+        recvID: conv.conversationType === SessionType.Single ? conv.userID : "",
+        groupID: conv.conversationType === SessionType.Group ? conv.groupID : "",
+        message,
+      };
+      set((s) => { if (!s.messagesMap[conversationID]) s.messagesMap[conversationID] = []; s.messagesMap[conversationID].push(message); });
+      try {
+        const sendRes = await im.sendMessage(params);
+        if (sendRes.data) {
+          set((s) => {
+            const msgs = s.messagesMap[conversationID];
+            if (msgs) {
+              const idx = msgs.findIndex((m) => m.clientMsgID === message.clientMsgID);
+              if (idx >= 0) msgs[idx] = sendRes.data!;
+            }
+          });
+        }
+      } catch (e) {
+        set((s) => {
+          const msgs = s.messagesMap[conversationID];
+          if (msgs) {
+            const idx = msgs.findIndex((m) => m.clientMsgID === message.clientMsgID);
+            if (idx >= 0) (msgs[idx] as any).status = 3;
+          }
+        });
+      }
+    },
+
+    sendAtMessage: async (conversationID, text, atUserIDList) => {
+      const im = getIMSDK();
+      const state = get();
+      const conv = state.conversations.find((c) => c.conversationID === conversationID);
+      if (!conv) return;
+      const msgRes = await im.createTextAtMessage({ text, atUserIDList, message: undefined } as any);
+      const message = msgRes.data;
+      if (!message) return;
+      const params: any = {
+        recvID: conv.conversationType === SessionType.Single ? conv.userID : "",
+        groupID: conv.conversationType === SessionType.Group ? conv.groupID : "",
+        message,
+      };
+      set((s) => { if (!s.messagesMap[conversationID]) s.messagesMap[conversationID] = []; s.messagesMap[conversationID].push(message); });
+      try {
+        const sendRes = await im.sendMessage(params);
+        if (sendRes.data) {
+          set((s) => {
+            const msgs = s.messagesMap[conversationID];
+            if (msgs) {
+              const idx = msgs.findIndex((m) => m.clientMsgID === message.clientMsgID);
+              if (idx >= 0) msgs[idx] = sendRes.data!;
+            }
+          });
+        }
+      } catch (e) {
+        set((s) => {
+          const msgs = s.messagesMap[conversationID];
+          if (msgs) {
+            const idx = msgs.findIndex((m) => m.clientMsgID === message.clientMsgID);
+            if (idx >= 0) (msgs[idx] as any).status = 3;
+          }
+        });
+      }
+    },
+
+    searchLocalMessages: async (conversationID, keywordList) => {
+      const im = getIMSDK();
+      try {
+        const res = await im.searchLocalMessages({ conversationID, keywordList, count: 20 } as any);
+        const items = res.data?.searchResultItems || [];
+        return items.flatMap((item: any) => item.messageList || []);
+      } catch (e) {
+        console.error("searchLocalMessages:", e);
+        return [];
+      }
+    },
+
     addFriend: async (userID, reqMsg) => { const im = getIMSDK(); await im.addFriend({ toUserID: userID, reqMsg }); },
     acceptFriendRequest: async (userID) => {
       const im = getIMSDK();
@@ -427,6 +529,35 @@ export const useAppStore = create<AppState>()(
       const im = getIMSDK();
       await im.deleteFriend(userID);
       set((s) => { s.friends = s.friends.filter((f) => f.userID !== userID); });
+    },
+    setFriendRemark: async (userID, remark) => {
+      const im = getIMSDK();
+      await im.updateFriends({ friendUserIDs: [userID], remark });
+      const frRes = await im.getFriendList();
+      set((s) => { s.friends = frRes.data || []; });
+    },
+    loadBlackList: async () => {
+      const im = getIMSDK();
+      try {
+        const res = await im.getBlackList();
+        set((s) => { s.blackList = res.data || []; });
+      } catch (e) { console.error("loadBlackList:", e); }
+    },
+    addBlack: async (userID) => {
+      const im = getIMSDK();
+      try {
+        await im.addBlack({ toUserID: userID });
+        const res = await im.getBlackList();
+        set((s) => { s.blackList = res.data || []; });
+      } catch (e) { console.error("addBlack:", e); }
+    },
+    removeBlack: async (userID) => {
+      const im = getIMSDK();
+      try {
+        await im.removeBlack(userID);
+        const res = await im.getBlackList();
+        set((s) => { s.blackList = res.data || []; });
+      } catch (e) { console.error("removeBlack:", e); }
     },
 
     createGroup: async (name, memberUserIDs) => {
@@ -527,5 +658,7 @@ export const useAppStore = create<AppState>()(
         return null;
       }
     },
+    toggleDarkMode: () => set((s) => { s.darkMode = !s.darkMode; }),
+    setDarkMode: (val) => set((s) => { s.darkMode = val; }),
   }))
 );

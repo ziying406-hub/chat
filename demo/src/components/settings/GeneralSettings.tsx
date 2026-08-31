@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
+import { useAppStore } from "../../store/app-store";
 
 export default function GeneralSettings() {
   const navigate = useNavigate();
+  const darkMode = useAppStore((s) => s.darkMode);
+  const toggleDarkMode = useAppStore((s) => s.toggleDarkMode);
   const [notif, setNotif] = useState(true);
-  const [darkMode, setDarkMode] = useState(false);
   const [fontScale, setFontScale] = useState(1);
 
   return (
@@ -24,7 +26,7 @@ export default function GeneralSettings() {
         </div>
         <div className="px-5 py-3.5 flex items-center justify-between border-b border-gray-50">
           <span className="text-sm text-gray-600">深色模式</span>
-          <button onClick={() => setDarkMode(!darkMode)} className={`w-11 h-6 rounded-full transition-colors ${darkMode ? "bg-primary-500" : "bg-gray-200"}`}>
+          <button onClick={toggleDarkMode} className={`w-11 h-6 rounded-full transition-colors ${darkMode ? "bg-primary-500" : "bg-gray-200"}`}>
             <span className={`block w-5 h-5 bg-white rounded-full shadow transition-transform ${darkMode ? "translate-x-5" : "translate-x-0.5"}`} />
           </button>
         </div>

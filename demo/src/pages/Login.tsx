@@ -1,9 +1,18 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { MessageCircle, Eye, EyeOff, Phone, Lock, User, ShieldCheck, Loader2 } from "lucide-react";
+import { useNavigate, Link } from "react-router-dom";
+import { MessageCircle, Eye, EyeOff, Phone, Lock, User, ShieldCheck, Loader2, ChevronDown } from "lucide-react";
 import { useAppStore } from "../store/app-store";
 
-type Tab = "login" | "register";
+type Tab = "login" | "register" | "verify";
+
+const AREA_CODES = [
+  { code: "+86", label: "+86 中国" },
+  { code: "+852", label: "+852 香港" },
+  { code: "+886", label: "+886 台湾" },
+  { code: "+65", label: "+65 新加坡" },
+  { code: "+60", label: "+60 马来西亚" },
+  { code: "+84", label: "+84 越南" },
+];
 
 export default function Login() {
   const navigate = useNavigate();
@@ -22,11 +31,13 @@ export default function Login() {
   const [showPwd, setShowPwd] = useState(false);
   const [codeSent, setCodeSent] = useState(false);
   const [sendingCode, setSendingCode] = useState(false);
+  const [areaCode, setAreaCode] = useState("+86");
+  const [areaOpen, setAreaOpen] = useState(false);
 
   const handleLogin = async () => {
     if (!phone.trim() || !password.trim()) return;
     try {
-      await login({ phoneNumber: phone.trim(), password });
+      await login({ phoneNumber: phone.trim(), password, areaCode });
       navigate("/messages", { replace: true });
     } catch {}
   };
@@ -34,7 +45,16 @@ export default function Login() {
   const handleRegister = async () => {
     if (!phone.trim() || !password.trim() || !nickname.trim() || !code.trim()) return;
     try {
-      await register({ phoneNumber: phone.trim(), verifyCode: code.trim(), nickname, password });
+      await register({ phoneNumber: phone.trim(), verifyCode: code.trim(), nickname, password, areaCode });
+      navigate("/messages", { replace: true });
+    } catch {}
+  };
+
+  const handleVerifyLogin = async () => {
+    if (!phone.trim() || !code.trim()) return;
+    try {
+      await sendCode(phone.trim(), areaCode);
+      await register({ phoneNumber: phone.trim(), verifyCode: code.trim(), nickname: phone.trim(), password: code.trim(), areaCode });
       navigate("/messages", { replace: true });
     } catch {}
   };
@@ -43,10 +63,16 @@ export default function Login() {
     if (!phone.trim()) return;
     setSendingCode(true);
     try {
-      await sendCode(phone.trim());
+      await sendCode(phone.trim(), areaCode);
       setCodeSent(true);
     } catch {}
     setSendingCode(false);
+  };
+
+  const handleSubmit = () => {
+    if (tab === "login") handleLogin();
+    else if (tab === "register") handleRegister();
+    else handleVerifyLogin();
   };
 
   return (
@@ -65,7 +91,11 @@ export default function Login() {
           <button
             onClick={() => { setTab("login"); setAuthError(null); }}
             className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${tab === "login" ? "bg-white text-primary-600 shadow-sm" : "text-gray-400"}`}
-          >登录</button>
+          >密码登录</button>
+          <button
+            onClick={() => { setTab("verify"); setAuthError(null); }}
+            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${tab === "verify" ? "bg-white text-primary-600 shadow-sm" : "text-gray-400"}`}
+          >验证码登录</button>
           <button
             onClick={() => { setTab("register"); setAuthError(null); }}
             className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${tab === "register" ? "bg-white text-primary-600 shadow-sm" : "text-gray-400"}`}
@@ -94,18 +124,47 @@ export default function Login() {
 
           <div>
             <label className="text-sm text-gray-500 mb-1 block">手机号</label>
-            <div className="relative">
-              <Phone size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" />
-              <input
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:border-primary-500 transition-colors"
-                placeholder="请输入手机号"
-              />
+            <div className="flex gap-2">
+              {/* Area code selector */}
+              <div className="relative">
+                <button
+                  onClick={() => setAreaOpen(!areaOpen)}
+                  className="h-full pl-3 pr-2 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:border-primary-500 transition-colors flex items-center gap-1 whitespace-nowrap"
+                >
+                  {areaCode}
+                  <ChevronDown size={14} className="text-gray-400" />
+                </button>
+                {areaOpen && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setAreaOpen(false)} />
+                    <div className="absolute z-20 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-auto w-40">
+                      {AREA_CODES.map((ac) => (
+                        <button
+                          key={ac.code}
+                          onClick={() => { setAreaCode(ac.code); setAreaOpen(false); }}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 transition-colors"
+                        >
+                          {ac.label}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+              {/* Phone input */}
+              <div className="relative flex-1">
+                <Phone size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" />
+                <input
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:border-primary-500 transition-colors"
+                  placeholder="请输入手机号"
+                />
+              </div>
             </div>
           </div>
 
-          {tab === "register" && (
+          {(tab === "register" || tab === "verify") && (
             <div>
               <label className="text-sm text-gray-500 mb-1 block">验证码</label>
               <div className="flex gap-2">
@@ -123,46 +182,48 @@ export default function Login() {
                   disabled={sendingCode || codeSent}
                   className="px-4 py-2.5 text-sm border border-primary-200 text-primary-500 rounded-xl hover:bg-primary-50 transition-colors disabled:opacity-50 whitespace-nowrap"
                 >
-                  {sendingCode ? "发送中..." : codeSent ? "已发送" : "发送验证码"}
+                  {sendingCode ? "发送中..." : codeSent ? "已发送" : "获取验证码"}
                 </button>
               </div>
             </div>
           )}
 
-          <div>
-            <label className="text-sm text-gray-500 mb-1 block">密码</label>
-            <div className="relative">
-              <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" />
-              <input
-                type={showPwd ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                onKeyDown={(e) => tab === "login" && e.key === "Enter" && handleLogin()}
-                className="w-full pl-10 pr-10 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:border-primary-500 transition-colors"
-                placeholder="请输入密码"
-              />
-              <button
-                onClick={() => setShowPwd(!showPwd)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-              >
-                {showPwd ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
+          {tab !== "verify" && (
+            <div>
+              <label className="text-sm text-gray-500 mb-1 block">密码</label>
+              <div className="relative">
+                <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" />
+                <input
+                  type={showPwd ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onKeyDown={(e) => tab === "login" && e.key === "Enter" && handleSubmit()}
+                  className="w-full pl-10 pr-10 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:border-primary-500 transition-colors"
+                  placeholder="请输入密码"
+                />
+                <button
+                  onClick={() => setShowPwd(!showPwd)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showPwd ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           <button
-            onClick={tab === "login" ? handleLogin : handleRegister}
+            onClick={handleSubmit}
             disabled={isLoggingIn}
             className="w-full py-2.5 bg-primary-500 text-white rounded-xl font-medium hover:bg-primary-600 transition-colors shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {isLoggingIn && <Loader2 size={16} className="animate-spin" />}
-            {isLoggingIn ? "处理中..." : tab === "login" ? "登录" : "注册"}
+            {isLoggingIn ? "处理中..." : tab === "login" ? "登录" : tab === "verify" ? "登录" : "注册"}
           </button>
 
           {tab === "login" && (
             <div className="flex justify-between text-sm">
               <span className="text-gray-400">默认账号: 13800138000 / test123456</span>
-              <button className="text-gray-400 hover:underline">忘记密码？</button>
+              <Link to="/auth/forgot-password" className="text-gray-400 hover:underline">忘记密码？</Link>
             </div>
           )}
         </div>

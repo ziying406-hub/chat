@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, ChevronRight } from "lucide-react";
+import { useAppStore } from "../../store/app-store";
 
 export default function PrivacySettings() {
   const navigate = useNavigate();
+  const blackList = useAppStore((s) => s.blackList);
   const [showOnline, setShowOnline] = useState(true);
   const [encrypt, setEncrypt] = useState(true);
 
@@ -32,9 +34,9 @@ export default function PrivacySettings() {
       <div className="bg-white mt-2 border-y border-gray-50">
         <button className="w-full px-5 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors">
           <span className="text-sm text-gray-600">黑名单</span>
-          <div className="flex items-center gap-2"><span className="text-sm text-gray-400">0</span><ChevronRight size={16} className="text-gray-300" /></div>
+          <div className="flex items-center gap-2"><span className="text-sm text-gray-400">{blackList.length}</span><ChevronRight size={16} className="text-gray-300" /></div>
         </button>
-        <button className="w-full px-5 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors border-t border-gray-50">
+        <button onClick={() => navigate("/settings/change-password")} className="w-full px-5 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors border-t border-gray-50">
           <span className="text-sm text-gray-600">修改密码</span>
           <ChevronRight size={16} className="text-gray-300" />
         </button>

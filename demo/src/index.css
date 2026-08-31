@@ -38,3 +38,67 @@ body {
     background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23000000' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-14V10h-2v10h2zM3 28h14v-2H3v2zm0 6h14v-2H3v2zm0 6h14v-2H3v2zM3 16h14v-2H3v2zm0 6h14v-2H3v2z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
   }
 }
+
+/* ===== Dark mode ===== */
+html.dark body {
+  background: #1a1a1a;
+}
+
+html.dark .chat-bg {
+  background-color: #222222;
+  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-14V10h-2v10h2zM3 28h14v-2H3v2zm0 6h14v-2H3v2zm0 6h14v-2H3v2zM3 16h14v-2H3v2zm0 6h14v-2H3v2z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+}
+
+html.dark .bg-gray-50 { background-color: #1f1f1f !important; }
+html.dark .bg-gray-100 { background-color: #2a2a2a !important; }
+html.dark .bg-white { background-color: #2b2b2b !important; }
+
+html.dark .text-gray-800 { color: #e0e0e0 !important; }
+html.dark .text-gray-600 { color: #b0b0b0 !important; }
+html.dark .text-gray-500 { color: #999999 !important; }
+html.dark .text-gray-400 { color: #777777 !important; }
+html.dark .text-gray-300 { color: #555555 !important; }
+
+html.dark .border-gray-100 { border-color: #333333 !important; }
+html.dark .border-gray-50 { border-color: #2a2a2a !important; }
+
+html.dark input,
+html.dark textarea {
+  background-color: #333333 !important;
+  color: #e0e0e0 !important;
+}
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #666666 !important;
+}
+
+html.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+}
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* ===== Responsive: mobile ===== */
+.mobile-tabbar {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .sidebar-nav {
+    display: none;
+  }
+  .mobile-tabbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 56px;
+    background: #ffffff;
+    border-top: 1px solid #f0f0f0;
+    z-index: 50;
+  }
+}

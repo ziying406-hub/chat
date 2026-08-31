@@ -13,6 +13,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   const isAuthed = useAppStore((s) => s.isAuthed);
+  const darkMode = useAppStore((s) => s.darkMode);
 
   // Register WebMCP tools after login
   useEffect(() => {
@@ -20,6 +21,11 @@ export default function App() {
       registerWebMCP();
     }
   }, [isAuthed]);
+
+  // Toggle dark mode class on <html>
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", darkMode);
+  }, [darkMode]);
 
   return (
     <HashRouter>

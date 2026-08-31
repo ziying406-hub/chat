@@ -1,5 +1,5 @@
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
-import { Settings as SettingsIcon, Shield, Info, LogOut, QrCode } from "lucide-react";
+import { Settings as SettingsIcon, Shield, Info, LogOut, QrCode, Key } from "lucide-react";
 import { useAppStore } from "../../store/app-store";
 import { useState } from "react";
 
@@ -38,6 +38,15 @@ export default function Settings() {
             <button onClick={() => navigate("/settings/privacy")} className={`w-full flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-gray-50 ${isActive("/settings/privacy") ? "bg-primary-50" : ""}`}>
               <Shield size={18} className="text-gray-400" /><span className="text-sm text-gray-600">隐私与安全</span>
             </button>
+            <button onClick={() => navigate("/settings/change-password")} className={`w-full flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-gray-50 ${isActive("/settings/change-password") ? "bg-primary-50" : ""}`}>
+              <Key size={18} className="text-gray-400" /><span className="text-sm text-gray-600">修改密码</span>
+            </button>
+            <button className="w-full flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-gray-50">
+              <Info size={18} className="text-gray-400" /><span className="text-sm text-gray-600">账号切换</span>
+            </button>
+          </div>
+
+          <div className="mt-2 border-t border-gray-50">
             <button className="w-full flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-gray-50">
               <Info size={18} className="text-gray-400" /><span className="text-sm text-gray-600">关于我们</span>
             </button>
