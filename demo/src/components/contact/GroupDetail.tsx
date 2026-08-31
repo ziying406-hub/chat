@@ -29,10 +29,6 @@ export default function GroupDetail() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const groupEx = (() => { try { return JSON.parse(group?.ex || "{}"); } catch { return {}; } })();
-  const isPublic = groupEx.isPublic ?? false;
-  const needVerification = group?.needVerification ?? 0;
-
   const group = groups.find((g) => g.groupID === id);
 
   useEffect(() => {
@@ -40,6 +36,10 @@ export default function GroupDetail() {
   }, [id]);
 
   if (!group) return <div className="flex-1 flex items-center justify-center text-gray-300">群组不存在</div>;
+
+  const groupEx = (() => { try { return JSON.parse(group?.ex || "{}"); } catch { return {}; } })();
+  const isPublic = groupEx.isPublic ?? false;
+  const needVerification = group?.needVerification ?? 0;
 
   const sorted = [...members].sort((a, b) => (b.roleLevel || 0) - (a.roleLevel || 0));
   const myMember = members.find((m) => m.userID === currentUser?.userID);
