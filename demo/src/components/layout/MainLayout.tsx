@@ -9,14 +9,22 @@ import GroupList from "../contact/GroupList";
 import GroupDetail from "../contact/GroupDetail";
 import FriendRequests from "../contact/FriendRequests";
 import CreateGroup from "../contact/CreateGroup";
+import SearchUser from "../contact/SearchUser";
+import SearchGroup from "../contact/SearchGroup";
+import Home from "../../pages/Home";
+import TagManagement from "../contact/TagManagement";
 import GroupAdmin from "../group/GroupAdmin";
 import Settings from "../settings/Settings";
 import ProfileEdit from "../settings/ProfileEdit";
 import GeneralSettings from "../settings/GeneralSettings";
 import PrivacySettings from "../settings/PrivacySettings";
 import ChangePassword from "../settings/ChangePassword";
+import AboutUs from "../settings/AboutUs";
 import CallOverlay from "../call/CallOverlay";
 import EmptyState from "../chat/EmptyState";
+import MessagingDebug from "../developer/MessagingDebug";
+import Logs from "../developer/Logs";
+import Feedback from "../developer/Feedback";
 
 function NavButton({ icon, label, path, active, badge }: {
   icon: React.ReactNode; label: string; path: string; active: boolean; badge?: number;
@@ -72,6 +80,9 @@ export default function MainLayout() {
           <Route path="group/:id" element={<GroupDetail />} />
           <Route path="requests" element={<FriendRequests />} />
           <Route path="create-group" element={<CreateGroup />} />
+          <Route path="tags" element={<TagManagement />} />
+          <Route path="search/user" element={<SearchUser />} />
+          <Route path="search/group" element={<SearchGroup />} />
         </Route>
         <Route path="/settings" element={<Settings />}>
           <Route index element={<div className="flex-1 flex items-center justify-center text-gray-300 text-sm">选择一个设置项</div>} />
@@ -79,7 +90,12 @@ export default function MainLayout() {
           <Route path="general" element={<GeneralSettings />} />
           <Route path="privacy" element={<PrivacySettings />} />
           <Route path="change-password" element={<ChangePassword />} />
+          <Route path="about" element={<AboutUs />} />
         </Route>
+        <Route path="/home" element={<Home />} />
+        <Route path="/developer/messaging" element={<MessagingDebug />} />
+        <Route path="/developer/logs" element={<Logs />} />
+        <Route path="/developer/feedback" element={<Feedback />} />
         <Route path="*" element={<Navigate to="/messages" replace />} />
       </Routes>
 

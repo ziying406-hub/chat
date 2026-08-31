@@ -19,10 +19,27 @@ import {
 } from "../services/openim";
 import { SessionType, MessageType } from "@openim/wasm-client-sdk";
 
+interface TagItem {
+  tagID: string;
+  name: string;
+  memberIDs: string[];
+}
+
 interface AuthData {
   imToken: string;
   chatToken: string;
   userID: string;
+}
+
+
+function saveAccountToLocal(authData: AuthData, nickname: string, faceURL: string, phoneNumber: string) {
+  try {
+    const raw = localStorage.getItem("99chat_accounts");
+    const accounts = raw ? JSON.parse(raw) : [];
+    const filtered = accounts.filter((a: any) => a.userID !== authData.userID);
+    filtered.unshift({ userID: authData.userID, imToken: authData.imToken, nickname, faceURL, phoneNumber });
+    localStorage.setItem("99chat_accounts", JSON.stringify(filtered));
+  } catch {}
 }
 
 interface AppState {
@@ -44,6 +61,8 @@ interface AppState {
   blackList: any[];
   totalUnread: number;
   darkMode: boolean;
+  onlineStatus: Record<string, boolean>;
+  tags: TagItem[];
 
   // Auth
   sendCode: (phone: string, areaCode?: string) => Promise<void>;
@@ -66,7 +85,9 @@ interface AppState {
   revokeMessage: (conversationID: string, clientMsgID: string) => Promise<void>;
   sendQuoteMessage: (conversationID: string, text: string, quoteMessage: string) => Promise<void>;
   sendAtMessage: (conversationID: string, text: string, atUserIDList: string[]) => Promise<void>;
+  sendEmoticonMessage: (conversationID: string, emoji: string) => Promise<void>;
   searchLocalMessages: (conversationID: string, keywordList: string[]) => Promise<any[]>;
+  sendContactCard: (conversationID: string, userID: string, nickname: string, faceURL: string) => Promise<void>;
 
   // Friends
   addFriend: (userID: string, reqMsg: string) => Promise<void>;
@@ -77,6 +98,15 @@ interface AppState {
   loadBlackList: () => Promise<void>;
   addBlack: (userID: string) => Promise<void>;
   removeBlack: (userID: string) => Promise<void>;
+
+  // Online Status
+  loadOnlineStatus: (userIDs: string[]) => Promise<void>;
+
+  // Tags
+  loadTags: () => void;
+  createTag: (name: string, memberIDs: string[]) => void;
+  updateTag: (tagID: string, name: string, memberIDs: string[]) => void;
+  deleteTag: (tagID: string) => void;
 
   // Groups
   createGroup: (name: string, memberUserIDs: string[]) => Promise<void>;
@@ -117,6 +147,8 @@ export const useAppStore = create<AppState>()(
     totalUnread: 0,
     blackList: [],
     darkMode: false,
+    onlineStatus: {},
+    tags: [],
 
     sendCode: async (phone, areaCode = "+86") => {
       try {
@@ -136,6 +168,8 @@ export const useAppStore = create<AppState>()(
         set((s) => { s.authData = data; });
         await get().loadAllData();
         set((s) => { s.isAuthed = true; s.isLoggingIn = false; });
+        const cu = get().currentUser;
+        if (cu) saveAccountToLocal(data, cu.nickname || "", cu.faceURL || "", params.phoneNumber);
       } catch (e: any) {
         set((s) => { s.authError = e.message; s.isLoggingIn = false; });
         throw e;
@@ -150,6 +184,8 @@ export const useAppStore = create<AppState>()(
         set((s) => { s.authData = data; });
         await get().loadAllData();
         set((s) => { s.isAuthed = true; s.isLoggingIn = false; });
+        const cu = get().currentUser;
+        if (cu) saveAccountToLocal(data, cu.nickname || "", cu.faceURL || "", params.phoneNumber);
       } catch (e: any) {
         set((s) => { s.authError = e.message; s.isLoggingIn = false; });
         throw e;
@@ -256,6 +292,14 @@ export const useAppStore = create<AppState>()(
         im.getFriendList().then((res) => { set((s) => { s.friends = res.data || []; }); });
       });
       on(CbEvents.OnSyncServerFinish, () => { get().loadAllData(); });
+      on(CbEvents.OnUserStatusChanged, (data: any) => {
+        const arr = Array.isArray(data) ? data : [data];
+        set((s) => {
+          for (const item of arr) {
+            if (item?.userID) s.onlineStatus[item.userID] = item.status === 1;
+          }
+        });
+      });
     },
 
     setActiveConversation: (id) => set((s) => {
@@ -498,6 +542,29 @@ export const useAppStore = create<AppState>()(
       }
     },
 
+    sendEmoticonMessage: async (conversationID, emoji) => {
+      const im = getIMSDK();
+      const state = get();
+      const conv = state.conversations.find((c) => c.conversationID === conversationID);
+      if (!conv) return;
+      try {
+        const msgRes = await im.createCustomMessage({
+          data: JSON.stringify({ emoji }),
+          extension: "emoticon",
+          description: "表情",
+        });
+        const message = msgRes.data;
+        if (!message) return;
+        const params: any = {
+          recvID: conv.conversationType === SessionType.Single ? conv.userID : "",
+          groupID: conv.conversationType === SessionType.Group ? conv.groupID : "",
+          message,
+        };
+        set((s) => { if (!s.messagesMap[conversationID]) s.messagesMap[conversationID] = []; s.messagesMap[conversationID].push(message); });
+        await im.sendMessage(params);
+      } catch (e) { console.error("sendEmoticon:", e); }
+    },
+
     searchLocalMessages: async (conversationID, keywordList) => {
       const im = getIMSDK();
       try {
@@ -507,6 +574,46 @@ export const useAppStore = create<AppState>()(
       } catch (e) {
         console.error("searchLocalMessages:", e);
         return [];
+      }
+    },
+
+    sendContactCard: async (conversationID, userID, nickname, faceURL) => {
+      const im = getIMSDK();
+      const state = get();
+      const conv = state.conversations.find((c) => c.conversationID === conversationID);
+      if (!conv) return;
+      const msgRes = await im.createCustomMessage({
+        data: JSON.stringify({ userID, nickname, faceURL }),
+        extension: "contactCard",
+        description: "名片",
+      });
+      const message = msgRes.data;
+      if (!message) return;
+      const params: any = {
+        recvID: conv.conversationType === SessionType.Single ? conv.userID : "",
+        groupID: conv.conversationType === SessionType.Group ? conv.groupID : "",
+        message,
+      };
+      set((s) => { if (!s.messagesMap[conversationID]) s.messagesMap[conversationID] = []; s.messagesMap[conversationID].push(message); });
+      try {
+        const sendRes = await im.sendMessage(params);
+        if (sendRes.data) {
+          set((s) => {
+            const msgs = s.messagesMap[conversationID];
+            if (msgs) {
+              const idx = msgs.findIndex((m) => m.clientMsgID === message.clientMsgID);
+              if (idx >= 0) msgs[idx] = sendRes.data!;
+            }
+          });
+        }
+      } catch (e) {
+        set((s) => {
+          const msgs = s.messagesMap[conversationID];
+          if (msgs) {
+            const idx = msgs.findIndex((m) => m.clientMsgID === message.clientMsgID);
+            if (idx >= 0) (msgs[idx] as any).status = 3;
+          }
+        });
       }
     },
 
@@ -636,6 +743,55 @@ export const useAppStore = create<AppState>()(
         await im.refuseGroupApplication({ groupID, fromUserID, handleMsg: "拒绝" } as any);
         await get().loadGroupApplications();
       } catch (e) { console.error("refuseGroupApp:", e); }
+    },
+
+    loadOnlineStatus: async (userIDs) => {
+      const im = getIMSDK();
+      if (userIDs.length === 0) return;
+      try {
+        await im.subscribeUsersStatus(userIDs);
+        const res = await im.getSubscribeUsersStatus();
+        const list = res.data || [];
+        set((s) => {
+          for (const item of list) {
+            if (item.userID) s.onlineStatus[item.userID] = item.status === 1;
+          }
+        });
+      } catch (e) { console.error("loadOnlineStatus:", e); }
+    },
+
+    loadTags: () => {
+      try {
+        const raw = localStorage.getItem("99chat_tags");
+        const tags = raw ? JSON.parse(raw) : [];
+        set((s) => { s.tags = tags; });
+      } catch { set((s) => { s.tags = []; }); }
+    },
+
+    createTag: (name, memberIDs) => {
+      const tag: TagItem = { tagID: `tag_${Date.now()}`, name, memberIDs };
+      set((s) => {
+        s.tags.push(tag);
+        localStorage.setItem("99chat_tags", JSON.stringify(s.tags));
+      });
+    },
+
+    updateTag: (tagID, name, memberIDs) => {
+      set((s) => {
+        const tag = s.tags.find((t) => t.tagID === tagID);
+        if (tag) {
+          tag.name = name;
+          tag.memberIDs = memberIDs;
+          localStorage.setItem("99chat_tags", JSON.stringify(s.tags));
+        }
+      });
+    },
+
+    deleteTag: (tagID) => {
+      set((s) => {
+        s.tags = s.tags.filter((t) => t.tagID !== tagID);
+        localStorage.setItem("99chat_tags", JSON.stringify(s.tags));
+      });
     },
 
     updateSelfInfo: async (info) => {

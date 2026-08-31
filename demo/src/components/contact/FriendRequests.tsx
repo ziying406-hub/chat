@@ -10,8 +10,11 @@ export default function FriendRequests() {
   const accept = useAppStore((s) => s.acceptFriendRequest);
   const reject = useAppStore((s) => s.rejectFriendRequest);
   const currentUser = useAppStore((s) => s.currentUser);
+  const friends = useAppStore((s) => s.friends);
   const [showQR, setShowQR] = useState(false);
   const [showScan, setShowScan] = useState(false);
+  const [showShareCard, setShowShareCard] = useState(false);
+  const [shareUserID, setShareUserID] = useState("");
   const [addUserID, setAddUserID] = useState("");
 
   const addFriend = useAppStore((s) => s.addFriend);
@@ -44,7 +47,7 @@ export default function FriendRequests() {
           <div className="w-12 h-12 rounded-xl bg-green-50 flex items-center justify-center text-green-500"><ScanLine size={24} /></div>
           <span className="text-xs text-gray-500">扫一扫</span>
         </button>
-        <button className="flex flex-col items-center gap-2">
+        <button onClick={() => setShowShareCard(true)} className="flex flex-col items-center gap-2">
           <div className="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center text-amber-500"><Share2 size={24} /></div>
           <span className="text-xs text-gray-500">分享名片</span>
         </button>
@@ -110,6 +113,56 @@ export default function FriendRequests() {
             />
             <button onClick={handleAdd} className="w-full py-2.5 bg-primary-500 text-white rounded-xl text-sm font-medium hover:bg-primary-600 transition-colors">发送申请</button>
             <button onClick={() => setShowScan(false)} className="text-sm text-gray-400 hover:text-gray-600">取消</button>
+          </div>
+        </div>
+      )}
+
+      {/* Share contact card modal */}
+      {showShareCard && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => { setShowShareCard(false); setShareUserID(''); }}>
+          <div className="bg-white rounded-2xl p-8 flex flex-col items-center gap-4 w-80" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-gray-800">分享名片</h3>
+            {!shareUserID ? (
+              <>
+                <p className="text-sm text-gray-400">选择要分享的好友</p>
+                <div className="w-full max-h-60 overflow-y-auto">
+                  {friends.length === 0 && <p className="text-center text-sm text-gray-300 py-4">暂无好友</p>}
+                  {friends.map((f) => (
+                    <button
+                      key={f.userID}
+                      onClick={() => setShareUserID(f.userID)}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50 rounded-lg transition-colors"
+                    >
+                      <img src={f.faceURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${f.userID}`} alt="" className="w-10 h-10 rounded-lg object-cover bg-gray-100" />
+                      <span className="text-sm font-medium text-gray-700">{f.remark || f.nickname || f.userID}</span>
+                    </button>
+                  ))}
+                </div>
+                <button onClick={() => { setShowShareCard(false); setShareUserID(''); }} className="text-sm text-gray-400 hover:text-gray-600">取消</button>
+              </>
+            ) : (
+              (() => {
+                const f = friends.find((fr) => fr.userID === shareUserID);
+                const nickname = f?.nickname || shareUserID;
+                const faceURL = f?.faceURL || '';
+                return (
+                  <>
+                    <p className="text-sm text-gray-400">{nickname} 的名片</p>
+                    <div className="w-48 h-48 bg-white border-2 border-gray-100 rounded-xl flex items-center justify-center p-3">
+                      <img src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=99chat:user:${shareUserID}`} alt="QR" className="w-full h-full" />
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <img src={faceURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${shareUserID}`} alt="" className="w-10 h-10 rounded-lg object-cover bg-gray-100" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-700">{nickname}</p>
+                        <p className="text-xs text-gray-400">ID: {shareUserID}</p>
+                      </div>
+                    </div>
+                    <button onClick={() => { setShowShareCard(false); setShareUserID(''); }} className="px-6 py-2 bg-primary-500 text-white rounded-xl text-sm hover:bg-primary-600 transition-colors">关闭</button>
+                  </>
+                );
+              })()
+            )}
           </div>
         </div>
       )}

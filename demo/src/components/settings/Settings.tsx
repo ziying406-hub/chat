@@ -1,5 +1,5 @@
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
-import { Settings as SettingsIcon, Shield, Info, LogOut, QrCode, Key } from "lucide-react";
+import { Settings as SettingsIcon, Shield, Info, LogOut, QrCode, Key, Wrench } from "lucide-react";
 import { useAppStore } from "../../store/app-store";
 import { useState } from "react";
 
@@ -47,8 +47,21 @@ export default function Settings() {
           </div>
 
           <div className="mt-2 border-t border-gray-50">
-            <button className="w-full flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-gray-50">
+            <button onClick={() => navigate("/settings/about")} className={`w-full flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-gray-50 ${isActive("/settings/about") ? "bg-primary-50" : ""}`}>
               <Info size={18} className="text-gray-400" /><span className="text-sm text-gray-600">关于我们</span>
+            </button>
+          </div>
+
+          <div className="mt-2 border-t border-gray-50">
+            <div className="px-5 py-2 text-xs text-gray-400 font-medium">开发者工具</div>
+            <button onClick={() => navigate("/developer/messaging")} className={`w-full flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-gray-50 ${isActive("/developer/messaging") ? "bg-primary-50" : ""}`}>
+              <Wrench size={18} className="text-gray-400" /><span className="text-sm text-gray-600">消息调试</span>
+            </button>
+            <button onClick={() => navigate("/developer/logs")} className={`w-full flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-gray-50 ${isActive("/developer/logs") ? "bg-primary-50" : ""}`}>
+              <Wrench size={18} className="text-gray-400" /><span className="text-sm text-gray-600">实时日志</span>
+            </button>
+            <button onClick={() => navigate("/developer/feedback")} className={`w-full flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-gray-50 ${isActive("/developer/feedback") ? "bg-primary-50" : ""}`}>
+              <Wrench size={18} className="text-gray-400" /><span className="text-sm text-gray-600">意见反馈</span>
             </button>
           </div>
 

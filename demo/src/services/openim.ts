@@ -130,3 +130,29 @@ export type {
   FriendApplicationItem,
   SelfUserInfo,
 };
+
+// ---------- FCM Push ----------
+
+export async function registerFCM(): Promise<void> {
+  let firebase: any;
+  try {
+    firebase = await import("firebase/messaging");
+  } catch {
+    // Firebase SDK not installed — skip FCM registration
+    return;
+  }
+
+  try {
+    const messaging = firebase.getMessaging();
+    const token = await firebase.getToken(messaging, {
+      vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY,
+    });
+    if (!token) return;
+
+    const expireTime = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60; // 7 days
+    const im = getIMSDK();
+    await im.updateFcmToken(token, expireTime);
+  } catch (e) {
+    console.warn("FCM registration failed:", e);
+  }
+}

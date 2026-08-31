@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Phone, Video, MessageSquare, QrCode, Tag, Ban, UserMinus } from "lucide-react";
 import { useAppStore } from "../../store/app-store";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function UserProfile() {
   const { id } = useParams();
@@ -14,11 +14,17 @@ export default function UserProfile() {
   const deleteFriend = useAppStore((s) => s.deleteFriend);
   const addBlack = useAppStore((s) => s.addBlack);
   const blackList = useAppStore((s) => s.blackList);
+  const onlineStatus = useAppStore((s) => s.onlineStatus);
+  const loadOnlineStatus = useAppStore((s) => s.loadOnlineStatus);
 
   const [showQR, setShowQR] = useState(false);
   const [showRemark, setShowRemark] = useState(false);
   const [remarkText, setRemarkText] = useState("");
   const [showDelete, setShowDelete] = useState(false);
+
+  useEffect(() => {
+    if (id) loadOnlineStatus([id]);
+  }, [id]);
 
   const friend = friends.find((f) => f.userID === id);
   const isSelf = id === currentUser?.userID;
@@ -66,7 +72,15 @@ export default function UserProfile() {
           {friend && (friend as any).remark && (
             <p className="text-sm text-gray-400 mt-0.5">备注: {(friend as any).remark}</p>
           )}
-          <span className="text-xs text-gray-400">ID: {id}</span>
+          <div className="flex items-center gap-1.5 mt-1">
+            {!isSelf && (
+              <span className="flex items-center gap-1 text-xs">
+                <span className={`w-2 h-2 rounded-full ${onlineStatus[id!] ? "bg-green-500" : "bg-gray-300"}`} />
+                <span className={onlineStatus[id!] ? "text-green-500" : "text-gray-400"}>{onlineStatus[id!] ? "在线" : "离线"}</span>
+              </span>
+            )}
+            <span className="text-xs text-gray-400">ID: {id}</span>
+          </div>
         </div>
         <button onClick={() => setShowQR(true)} className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 hover:bg-gray-100 transition-colors">
           <QrCode size={20} />

@@ -46,7 +46,8 @@ export default function Login() {
     if (!phone.trim() || !password.trim() || !nickname.trim() || !code.trim()) return;
     try {
       await register({ phoneNumber: phone.trim(), verifyCode: code.trim(), nickname, password, areaCode });
-      navigate("/messages", { replace: true });
+      const user = useAppStore.getState().currentUser;
+      navigate(user?.nickname ? "/messages" : "/auth/setup", { replace: true });
     } catch {}
   };
 
@@ -55,7 +56,8 @@ export default function Login() {
     try {
       await sendCode(phone.trim(), areaCode);
       await register({ phoneNumber: phone.trim(), verifyCode: code.trim(), nickname: phone.trim(), password: code.trim(), areaCode });
-      navigate("/messages", { replace: true });
+      const user = useAppStore.getState().currentUser;
+      navigate(user?.nickname ? "/messages" : "/auth/setup", { replace: true });
     } catch {}
   };
 

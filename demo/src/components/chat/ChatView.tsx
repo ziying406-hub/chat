@@ -3,13 +3,15 @@ import { useParams, useNavigate } from "react-router-dom";
 import {
   Phone, Video, MoreVertical, Smile, Paperclip, Send, Image as ImageIcon, Mic,
   ArrowLeft, RotateCcw, Copy, Trash2, Forward, Reply, Check, CheckCheck,
-  Play, Pause, X, Search,
+  Play, Pause, X, Search, Contact,
+
 } from "lucide-react";
 import { useAppStore } from "../../store/app-store";
 import { formatTime } from "../../utils/format";
 import { SessionType, MessageType } from "@openim/wasm-client-sdk";
 import { startCall } from "../call/CallOverlay";
 import MediaViewer from "../chat/media/MediaViewer";
+import EmojiPicker from "./EmojiPicker";
 
 export default function ChatView() {
   const { id } = useParams();
@@ -27,9 +29,11 @@ export default function ChatView() {
   const groupMembers = useAppStore((s) => s.groupMembersMap);
   const loadGroupMembers = useAppStore((s) => s.loadGroupMembers);
   const sendQuote = useAppStore((s) => s.sendQuoteMessage);
+  const sendEmoticon = useAppStore((s) => s.sendEmoticonMessage);
   const sendAt = useAppStore((s) => s.sendAtMessage);
   const searchMsgs = useAppStore((s) => s.searchLocalMessages);
   const groups = useAppStore((s) => s.groups);
+  const sendContactCard = useAppStore((s) => s.sendContactCard);
 
   const [input, setInput] = useState("");
   const [showMenu, setShowMenu] = useState(false);
@@ -42,9 +46,12 @@ export default function ChatView() {
   const [showMention, setShowMention] = useState(false);
   const [mentionUsers, setMentionUsers] = useState<string[]>([]);
   const [showSearch, setShowSearch] = useState(false);
+  const [showEmoji, setShowEmoji] = useState(false);
   const [searchKeyword, setSearchKeyword] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [showAnnouncement, setShowAnnouncement] = useState(false);
+  const [showAttachMenu, setShowAttachMenu] = useState(false);
+  const [showContactPicker, setShowContactPicker] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const msgEndRef = useRef<HTMLDivElement>(null);
@@ -111,6 +118,15 @@ export default function ChatView() {
       setMentionUsers([...mentionUsers, userID]);
     }
     setShowMention(false);
+  };
+
+  const handleEmojiPick = (emoji: string) => {
+    setInput(input + emoji);
+  };
+
+  const handleEmojiSend = async (emoji: string) => {
+    if (id) await sendEmoticon(id, emoji);
+    setShowEmoji(false);
   };
 
   const handleSearch = async () => {
@@ -340,6 +356,41 @@ export default function ChatView() {
                       );
                     })()}
 
+                    {/* Contact card */}
+                    {type === MessageType.CustomMessage && msg.customElem?.extension === "contactCard" && (() => {
+                      const card = JSON.parse(msg.customElem?.data || "{}");
+                      return (
+                        <div className={`px-3 py-2.5 rounded-2xl ${self ? "bg-primary-500 text-white rounded-tr-md" : "bg-white text-gray-700 rounded-tl-md shadow-sm"}`}>
+                          <div className="flex items-center gap-2 min-w-[200px]">
+                            <img src={card.faceURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${card.userID}`} alt="" className="w-10 h-10 rounded-lg object-cover bg-white/20" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{card.nickname || card.userID}</p>
+                              <p className="text-xs opacity-70 truncate">名片</p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => navigate(`/contact/user/${card.userID}`)}
+                            className={`mt-2 w-full py-1.5 rounded-lg text-xs font-medium ${self ? "bg-white/20 text-white" : "bg-primary-50 text-primary-500"}`}
+                          >
+                            查看资料
+                          </button>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Emoticon (custom message) */}
+                    {type === MessageType.CustomMessage && msg.customElem?.extension === "emoticon" && (() => {
+                      try {
+                        const parsed = JSON.parse(msg.customElem?.data || "{}");
+                        if (parsed.emoji) return <div className="px-2 py-1 text-3xl">{parsed.emoji}</div>;
+                      } catch {}
+                      return <div className="px-3.5 py-2.5 rounded-2xl text-sm bg-gray-100 text-gray-500">{msg.customElem?.description || "[自定义消息]"}</div>;
+                    })()}
+                    {/* Other custom messages */}
+                    {type === MessageType.CustomMessage && msg.customElem?.extension !== "emoticon" && msg.customElem?.extension !== "contactCard" && (
+                      <div className="px-3.5 py-2.5 rounded-2xl text-sm bg-gray-100 text-gray-500">{msg.customElem?.description || "[自定义消息]"}</div>
+                    )}
+
                     {/* Status */}
                     {self && type < 900 && (
                       <div className="flex items-center justify-end gap-1 mt-0.5 pr-1">
@@ -395,6 +446,15 @@ export default function ChatView() {
         </div>
       )}
 
+      {/* Emoji picker */}
+      {showEmoji && (
+        <EmojiPicker
+          onPick={handleEmojiPick}
+          onClose={() => setShowEmoji(false)}
+          onSend={handleEmojiSend}
+        />
+      )}
+
       {/* Input bar */}
       <div className="border-t border-gray-100 bg-white px-4 py-3 relative">
         {recording ? (
@@ -408,8 +468,13 @@ export default function ChatView() {
           </div>
         ) : (
           <div className="flex items-center gap-2">
-            <button className="text-gray-400 hover:text-primary-500"><Smile size={22} /></button>
-            <button className="text-gray-400 hover:text-primary-500"><Paperclip size={22} /></button>
+            <button onClick={() => setShowEmoji(!showEmoji)} className={`hover:text-primary-500 ${showEmoji ? "text-primary-500" : "text-gray-400"}`}><Smile size={22} /></button>
+            <button onClick={() => setShowAttachMenu(!showAttachMenu)} className="text-gray-400 hover:text-primary-500 relative"><Paperclip size={22} /></button>
+            {showAttachMenu && (
+              <div className="absolute bottom-12 left-8 z-50 bg-white rounded-xl shadow-xl border border-gray-100 py-1 w-32 text-sm" onClick={() => setShowAttachMenu(false)}>
+                <button onClick={() => setShowContactPicker(true)} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><Contact size={14} /> 发送名片</button>
+              </div>
+            )}
             <button onClick={handleImageSelect} className="text-gray-400 hover:text-primary-500"><ImageIcon size={22} /></button>
             <input value={input} onChange={handleInputChange} onKeyDown={(e) => e.key === "Enter" && handleSend()} placeholder="输入消息..." className="flex-1 px-3 py-2 bg-gray-50 rounded-lg text-sm outline-none focus:bg-white focus:ring-1 focus:ring-primary-200 transition-all" />
             <button onClick={startRecording} className="text-gray-400 hover:text-primary-500"><Mic size={22} /></button>
@@ -437,6 +502,39 @@ export default function ChatView() {
       {toast && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-gray-800 text-white text-sm px-4 py-2 rounded-lg shadow-lg">
           {toast}
+        </div>
+      )}
+
+      {/* Contact card picker modal */}
+      {showContactPicker && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setShowContactPicker(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-80 max-w-[90%] max-h-[60vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+              <h3 className="text-base font-semibold text-gray-800">发送名片</h3>
+              <button onClick={() => setShowContactPicker(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {friends.length === 0 && <div className="flex items-center justify-center py-10 text-gray-300 text-sm">暂无好友</div>}
+              {friends.map((f) => (
+                <button
+                  key={f.userID}
+                  onClick={async () => {
+                    if (!id) return;
+                    await sendContactCard(id, f.userID, f.nickname || f.userID, f.faceURL || "");
+                    setShowContactPicker(false);
+                    setShowAttachMenu(false);
+                  }}
+                  className="w-full flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors"
+                >
+                  <img src={f.faceURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${f.userID}`} alt="" className="w-10 h-10 rounded-lg object-cover bg-gray-100" />
+                  <div className="text-left">
+                    <p className="text-sm font-medium text-gray-700">{f.remark || f.nickname || f.userID}</p>
+                    <p className="text-xs text-gray-400">ID: {f.userID}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 

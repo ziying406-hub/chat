@@ -13,10 +13,19 @@ export default function ConversationList() {
   const pinConv = useAppStore((s) => s.pinConversation);
   const muteConv = useAppStore((s) => s.muteConversation);
   const deleteConv = useAppStore((s) => s.deleteConversation);
+  const onlineStatus = useAppStore((s) => s.onlineStatus);
+  const loadOnlineStatus = useAppStore((s) => s.loadOnlineStatus);
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [menuConv, setMenuConv] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const singleChatUserIDs = conversations
+      .filter((c) => c.conversationType === SessionType.Single && c.userID)
+      .map((c) => c.userID!);
+    if (singleChatUserIDs.length > 0) loadOnlineStatus(singleChatUserIDs);
+  }, [conversations.length]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -108,6 +117,9 @@ export default function ConversationList() {
                     <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-gray-400 text-white text-[11px] rounded-full flex items-center justify-center">
                       ·
                     </span>
+                  )}
+                  {c.conversationType === SessionType.Single && onlineStatus[c.userID!] && (
+                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
                   )}
                 </div>
 

@@ -1,5 +1,5 @@
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
-import { Search, UserPlus, Users, Tag } from "lucide-react";
+import { Search, UserPlus, Users, Tag, UserSearch, GroupSearch } from "lucide-react";
 import { useAppStore } from "../../store/app-store";
 import { useState } from "react";
 
@@ -53,7 +53,24 @@ export default function ContactList() {
             <div className="w-9 h-9 rounded-lg bg-green-50 flex items-center justify-center text-green-500"><Users size={18} /></div>
             <span className="text-sm font-medium">群组列表</span>
           </button>
-          <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-50 transition-colors">
+          <button
+            onClick={() => navigate("/contact/search/user")}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center text-blue-500"><UserSearch size={18} /></div>
+            <span className="text-sm font-medium">搜索用户</span>
+          </button>
+          <button
+            onClick={() => navigate("/contact/search/group")}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <div className="w-9 h-9 rounded-lg bg-purple-50 flex items-center justify-center text-purple-500"><GroupSearch size={18} /></div>
+            <span className="text-sm font-medium">搜索群组</span>
+          </button>
+          <button
+            onClick={() => navigate("/contact/tags")}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${isActive("/contact/tags") ? "bg-primary-50 text-primary-600" : "hover:bg-gray-50"}`}
+          >
             <div className="w-9 h-9 rounded-lg bg-amber-50 flex items-center justify-center text-amber-500"><Tag size={18} /></div>
             <span className="text-sm font-medium">标签</span>
           </button>
