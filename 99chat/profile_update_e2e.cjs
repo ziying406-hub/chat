@@ -16,6 +16,10 @@ async function login(page) {
   await login(page);
   await page.goto(`${BASE}/#/settings`);
   await page.waitForURL(/#\/settings\/profile$/, { timeout: 15000 });
+  await page.getByText('电话号码', { exact: true }).waitFor({ state: 'visible', timeout: 15000 });
+  if (!await page.getByText('13800138000', { exact: true }).count()) {
+    throw new Error('The signed-in account phone number is not displayed.');
+  }
   await page.getByRole('button', { name: '二维码', exact: true }).click();
   await page.getByAltText('我的二维码').waitFor({ state: 'visible', timeout: 15000 });
   await page.getByRole('button', { name: '关闭', exact: true }).click();

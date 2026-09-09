@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useMemo, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Camera, Loader2 } from "lucide-react";
 import { useAppStore } from "../../store/app-store";
@@ -15,6 +15,15 @@ export default function ProfileEdit() {
   const [avatarUrl, setAvatarUrl] = useState(currentUser?.faceURL || "");
   const [showQR, setShowQR] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const phoneNumber = useMemo(() => {
+    try {
+      const accounts = JSON.parse(localStorage.getItem("99chat_accounts") || "[]");
+      const account = accounts.find((item: { userID?: string }) => item.userID === currentUser?.userID);
+      return account?.phoneNumber || "";
+    } catch {
+      return "";
+    }
+  }, [currentUser?.userID]);
 
   const handleAvatarSelect = () => fileRef.current?.click();
 
@@ -78,6 +87,10 @@ export default function ProfileEdit() {
         <div className="px-5 py-3 flex items-center justify-between border-b border-gray-50">
           <span className="text-sm text-gray-500">个性签名</span>
           <input value={signature} onChange={(e) => setSignature(e.target.value)} placeholder="设置签名" className="text-sm text-gray-800 text-right outline-none w-40" />
+        </div>
+        <div className="px-5 py-3 flex items-center justify-between border-b border-gray-50">
+          <span className="text-sm text-gray-500">电话号码</span>
+          <span className="text-sm text-gray-400">{phoneNumber || "未绑定"}</span>
         </div>
         <div className="px-5 py-3 flex items-center justify-between">
           <span className="text-sm text-gray-500">用户 ID</span>
