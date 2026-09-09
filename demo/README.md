@@ -1,32 +1,51 @@
-# React + TypeScript + Vite
+# 99chat
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+99chat 是基于 React、Vite 和 OpenIM 构建的即时通讯客户端。前端位于本目录，OpenIM Docker 服务位于 `../openim-docker`。
 
-Currently, two official plugins are available:
+## 本地运行
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm install
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+默认开发地址为 `http://localhost:5199`。启动前请确保 OpenIM 服务可用：
+
+```bash
+cd ../openim-docker
+docker compose up -d
+```
+
+生产构建：
+
+```bash
+npm run build
+```
+
+## 服务端收藏
+
+“我的收藏”由 99chat 增加了服务端持久化能力，不是 OpenIM 可通过配置开启的内置功能。收藏记录按当前登录用户隔离，保存到 MongoDB 的 `99chat_favorites` 集合；因此同一账号在不同浏览器或设备上登录后可以读取相同收藏。
+
+收藏 API 由自定义 `openim-chat` 镜像提供，并且必须携带当前登录得到的 `chatToken`：
+
+| 接口 | 用途 |
+| --- | --- |
+| `POST /user/favorites/list` | 读取当前用户的收藏，按收藏时间倒序返回 |
+| `POST /user/favorites/save` | 新建或更新一条收藏；`clientMsgID` 是同一用户内的唯一键 |
+| `POST /user/favorites/delete` | 删除当前用户的一条收藏 |
+
+服务端从令牌获取用户身份，不接受前端指定的用户 ID。前端在服务临时不可用时会保留本机回退数据；服务恢复后新收藏会同步写入服务端。
+
+当前本地部署使用镜像：
+
+```text
+99chat/openim-chat:favorites
+```
+
+该镜像的源码在 `../99chat-chat-api`。重新构建和部署后，可通过下列命令查看服务状态：
+
+```bash
+cd ../openim-docker
+docker compose up -d --no-deps --force-recreate openim-chat
+docker inspect openim-chat --format '{{.State.Health.Status}}'
+```
