@@ -13,12 +13,23 @@ const IMAGE = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" widt
   await page.getByPlaceholder('请输入密码').fill('test123456');
   await page.getByRole('button', { name: '登录', exact: true }).click();
   await page.waitForURL(/#\/messages/, { timeout: 60000 });
-  await page.evaluate(({ image }) => {
-    const accounts = JSON.parse(localStorage.getItem('99chat_accounts') || '[]');
-    localStorage.setItem(`99chat_favorites_${accounts[0].userID}`, JSON.stringify([
-      { clientMsgID: 'collection-image', sendID: '3540424232', senderName: '测试好友', contentType: 102, time: Date.now(), kind: 'image', mediaUrl: image, content: '' },
-      { clientMsgID: 'collection-voice', sendID: '3540424232', senderName: '测试好友', contentType: 103, time: Date.now() - 60000, kind: 'voice', mediaUrl: 'https://example.invalid/voice.mp3', duration: 2, content: '' },
-    ]));
+  await page.evaluate(async ({ image }) => {
+    const login = await fetch('http://localhost:10008/account/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', operationID: `${Date.now()}collection` },
+      body: JSON.stringify({ areaCode: '+86', phoneNumber: '13800138000', password: 'test123456', platform: 5, autoLogin: true }),
+    }).then((response) => response.json());
+    if (login.errCode !== 0) throw new Error(login.errMsg || 'Could not obtain a chat API token.');
+    const save = async (item) => {
+      const result = await fetch('http://localhost:10008/user/favorites/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', token: login.data.chatToken, operationID: `${Date.now()}favorite` },
+        body: JSON.stringify(item),
+      }).then((response) => response.json());
+      if (result.errCode !== 0) throw new Error(result.errMsg || 'Could not save server-backed favorite.');
+    };
+    await save({ clientMsgID: 'collection-image', sendID: '3540424232', senderName: '测试好友', contentType: 102, time: Date.now(), kind: 'image', mediaUrl: image, content: '' });
+    await save({ clientMsgID: 'collection-voice', sendID: '3540424232', senderName: '测试好友', contentType: 103, time: Date.now() - 60000, kind: 'voice', mediaUrl: 'https://example.invalid/voice.mp3', duration: 2, content: '' });
   }, { image: IMAGE });
 
   await page.goto(`${BASE}/#/settings/collections`);
