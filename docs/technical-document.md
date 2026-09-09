@@ -5,8 +5,8 @@
 |---|---|
 | 系统名称 | 99chat |
 | 底层平台 | OpenIM |
-| 文档版本 | v1.0 |
-| 更新日期 | 2026-08-30 |
+| 文档版本 | v1.1 |
+| 更新日期 | 2026-09-09 |
 
 ---
 
@@ -31,6 +31,7 @@ graph TB
     subgraph "网关层"
         API["openim-api<br/>REST API (port 10002)"]
         WS["openim-msggateway<br/>WebSocket (port 10001)"]
+        CHAT["openim-chat<br/>账号与扩展 API (port 10008)"]
     end
 
     subgraph "RPC 服务层 (gRPC + Etcd)"
@@ -68,6 +69,7 @@ graph TB
     CF --> NGINX
     NGINX --> API
     NGINX --> WS
+    PWA -->|收藏 REST API| CHAT
     API --> AUTH & USER & FRIEND & GROUP & MSG & CONV & THIRD
     AUTH & USER & FRIEND & GROUP & MSG & CONV & THIRD --> ETCD
     WS --> KAFKA
@@ -358,6 +360,7 @@ interface SystemConfig {
 |---|---|---|---|
 | `openim-api` | 10002 | HTTP REST | API 网关 — 路由请求到 RPC 服务、鉴权、限流 |
 | `openim-msggateway` | 10001 | WebSocket | 长连接网关 — 维持客户端连接、消息推送、心跳、在线状态 |
+| `openim-chat` | 10008 | HTTP REST | 账号服务与 99chat 扩展 API；收藏接口在此服务中鉴权并写入 MongoDB |
 
 **openim-api 核心路由**：
 
@@ -396,6 +399,18 @@ interface SystemConfig {
 | `msgtransfer` | 消费 Kafka → 持久化 MongoDB → 缓存 Redis → 推送 msggateway |
 | `push` | 消费离线消息 → 通过 FCM/APNS 推送 |
 | `crontask` | 定时任务 — 消息清理、统计聚合 |
+
+### 3.1.4 服务端收藏 API
+
+收藏不是 OpenIM WASM SDK 的内置开关，而是 99chat 在 `openim-chat` 中增加的业务 API。所有路由均经过 `CheckToken` 中间件，服务端只从 `chatToken` 解析当前用户 ID，不信任请求体中的用户 ID。
+
+| 路由 | 请求 | 行为 |
+|---|---|---|
+| `POST /user/favorites/list` | 空 JSON 对象 | 返回当前用户的收藏，按 `time` 倒序 |
+| `POST /user/favorites/save` | 收藏字段，必须含 `clientMsgID` | 以 `userID + clientMsgID` 幂等写入收藏 |
+| `POST /user/favorites/delete` | `clientMsgID` | 仅删除当前用户拥有的收藏 |
+
+前端在 `src/services/openim.ts` 调用这些路由。`Collections` 和 `CollectionDetail` 优先读取服务端；服务不可用时才读取按用户隔离的 localStorage 迁移/回退数据。聊天消息收藏动作会先保留本机记录，再尝试写入服务端并向用户提示结果。
 
 ### 3.2 消息流转详细流程
 
@@ -464,6 +479,7 @@ sequenceDiagram
 | `group_members` | groupID, userID, roleLevel, joinTime | groupID+userID (唯一) |
 | `friends` | ownerUserID, friendUserID, remark | ownerUserID+friendUserID |
 | `friend_requests` | fromUserID, toUserID, handleStatus | fromUserID+toUserID |
+| `99chat_favorites` | userID, clientMsgID, sendID, senderName, content, contentType, time, kind, mediaURL, duration, fileName | userID+clientMsgID（唯一），time（倒序读取） |
 
 ---
 
