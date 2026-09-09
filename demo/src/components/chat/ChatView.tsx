@@ -383,9 +383,9 @@ export default function ChatView() {
 
       {isGroup && groupAnnouncement && dismissedAnnouncement !== groupAnnouncement && (
         <div data-group-announcement className="flex items-center gap-3 border-b border-amber-100 bg-amber-50 px-5 py-2.5 text-sm">
-          <button onClick={() => setShowAnnouncement(true)} className="flex min-w-0 flex-1 items-center text-left text-amber-900">
+          <button onClick={() => setShowAnnouncement(true)} className="flex h-6 min-w-0 flex-1 items-center overflow-hidden whitespace-nowrap text-left text-amber-900">
             <span className="mr-2 flex-shrink-0 font-medium">群公告</span>
-            <span className="truncate text-amber-800">{groupAnnouncement}</span>
+            <span className="min-w-0 flex-1 truncate text-amber-800">{groupAnnouncement}</span>
           </button>
           <button
             onClick={() => {
