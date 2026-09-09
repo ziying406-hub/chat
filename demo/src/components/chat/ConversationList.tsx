@@ -149,7 +149,7 @@ export default function ConversationList() {
           )}
           {filtered.map((c) => {
             const isPinned = (c as any).isPinned;
-            const isMuted = (c as any).recvMsgOpt && (c as any).recvMsgOpt > 0;
+            const isMuted = Number((c as any).recvMsgOpt) > 0;
             return (
               <div
                 key={c.conversationID}
