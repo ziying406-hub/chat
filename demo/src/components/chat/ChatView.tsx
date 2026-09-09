@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useAppStore } from "../../store/app-store";
 import { formatMessageDate, formatTime, isSameCalendarDay } from "../../utils/format";
+import { getUserStorageKey } from "../../utils/storage";
 import { SessionType, MessageType } from "@openim/wasm-client-sdk";
 import { startCall } from "../call/CallOverlay";
 import MediaViewer from "../chat/media/MediaViewer";
@@ -68,6 +69,7 @@ export default function ChatView() {
   const [multiSelect, setMultiSelect] = useState(false);
   const [selectedMsgs, setSelectedMsgs] = useState<Set<string>>(new Set());
   const [showFavorites, setShowFavorites] = useState(false);
+  const [dismissedAnnouncement, setDismissedAnnouncement] = useState("");
   const [showReport, setShowReport] = useState<any | null>(null);
   const [reportReason, setReportReason] = useState("");
   const [recCancel, setRecCancel] = useState(false);
@@ -104,6 +106,20 @@ export default function ChatView() {
       loadGroupMembers(conv.groupID);
     }
   }, [conv?.conversationType, conv?.groupID]);
+
+  const group = groups.find((item) => item.groupID === conv?.groupID);
+  const groupAnnouncement = group?.notification?.trim() || "";
+  const announcementStorageKey = currentUser && conv?.groupID
+    ? getUserStorageKey(`99chat_hidden_group_announcement_${conv.groupID}`, currentUser.userID)
+    : "";
+
+  useEffect(() => {
+    if (!announcementStorageKey) {
+      setDismissedAnnouncement("");
+      return;
+    }
+    setDismissedAnnouncement(localStorage.getItem(announcementStorageKey) || "");
+  }, [announcementStorageKey]);
 
   if (!conv) return <div className="flex-1 flex items-center justify-center text-gray-300">会话不存在</div>;
 
@@ -364,6 +380,24 @@ export default function ChatView() {
           )}
         </div>
       </div>
+
+      {isGroup && groupAnnouncement && dismissedAnnouncement !== groupAnnouncement && (
+        <div data-group-announcement className="flex items-center gap-3 border-b border-amber-100 bg-amber-50 px-5 py-2.5 text-sm">
+          <button onClick={() => setShowAnnouncement(true)} className="min-w-0 flex-1 text-left text-amber-900">
+            <span className="mr-2 font-medium">群公告</span>
+            <span className="text-amber-800">{groupAnnouncement}</span>
+          </button>
+          <button
+            onClick={() => {
+              if (announcementStorageKey) localStorage.setItem(announcementStorageKey, groupAnnouncement);
+              setDismissedAnnouncement(groupAnnouncement);
+            }}
+            className="flex-shrink-0 text-xs text-amber-700 hover:text-amber-900"
+          >
+            不再显示
+          </button>
+        </div>
+      )}
 
       {/* Hidden file input */}
       <input ref={imageFileRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
@@ -702,7 +736,7 @@ export default function ChatView() {
               <button onClick={() => setShowAnnouncement(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
             </div>
             <p className="text-sm text-gray-600 whitespace-pre-wrap max-h-60 overflow-y-auto">
-              {groups.find((g) => g.groupID === conv.groupID)?.notification || "暂无群公告"}
+              {groupAnnouncement || "暂无群公告"}
             </p>
           </div>
         </div>
