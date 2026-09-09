@@ -25,9 +25,6 @@ export default function TagManagement() {
   useEffect(() => { loadTags(); }, [loadTags]);
 
   const selectedTag = tags.find((t) => t.tagID === selectedTagID);
-  const selectedTagFriends = selectedTag
-    ? selectedTag.memberIDs.map((id) => friends.find((f) => f.userID === id)).filter(Boolean)
-    : [];
 
   const handleCreate = () => {
     if (!tagName.trim()) return;
@@ -80,7 +77,7 @@ export default function TagManagement() {
     }
   };
 
-  const openEdit = (tagID: string, name: string, memberIDs: string[]) => {
+  const openEdit = (_tagID: string, name: string, memberIDs: string[]) => {
     setTagName(name);
     setSelectedMembers(memberIDs);
     setShowEdit(true);

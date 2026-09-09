@@ -23,7 +23,6 @@ function loadAccounts(): StoredAccount[] {
 
 export default function AccountSwitch() {
   const navigate = useNavigate();
-  const login = useAppStore((s) => s.login);
   const [accounts, setAccounts] = useState<StoredAccount[]>([]);
   const [switching, setSwitching] = useState<string | null>(null);
 
@@ -34,9 +33,10 @@ export default function AccountSwitch() {
   const handleSwitch = async (account: StoredAccount) => {
     setSwitching(account.userID);
     try {
-      await sdkLogin(account.userID, account.imToken);
       const store = useAppStore.getState();
       store.setAuthError(null);
+      store.setInitialSyncing(true);
+      await sdkLogin(account.userID, account.imToken);
       await store.loadAllData();
       navigate("/messages", { replace: true });
     } catch (e: any) {

@@ -1,5 +1,4 @@
 import { useAppStore } from "./store/app-store";
-import { getIMSDK } from "./services/openim";
 
 /**
  * Register WebMCP tools so AI agents (like the ChatGPT browser extension)
@@ -9,10 +8,6 @@ import { getIMSDK } from "./services/openim";
  */
 export async function registerWebMCP() {
   const mc = (navigator as any).modelContext || (navigator as any).modelContextTesting;
-  if (!mc) {
-    console.warn("[WebMCP] navigator.modelContext not available. Enable chrome://flags/#enable-webmcp-testing and restart Chrome.");
-    return;
-  }
   if (!mc) {
     console.warn("[WebMCP] navigator.modelContext not available. Enable chrome://flags/#enable-webmcp-testing and restart Chrome.");
     return;

@@ -1,13 +1,18 @@
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Users, Plus } from "lucide-react";
 import { useAppStore } from "../../store/app-store";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export default function GroupList() {
   const navigate = useNavigate();
   const groups = useAppStore((s) => s.groups);
   const currentUser = useAppStore((s) => s.currentUser);
+  const refreshGroups = useAppStore((s) => s.refreshGroups);
   const [tab, setTab] = useState<"joined" | "created">("joined");
+
+  useEffect(() => {
+    refreshGroups().catch((error) => console.error("refreshGroups:", error));
+  }, [refreshGroups]);
 
   const filtered = tab === "created"
     ? groups.filter((g) => g.ownerUserID === currentUser?.userID)

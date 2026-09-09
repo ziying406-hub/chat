@@ -1,6 +1,8 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Phone, Video, MessageSquare, QrCode, Tag, Ban, UserMinus, Copy } from "lucide-react";
+import { ArrowLeft, MessageSquare, QrCode, Tag, Ban, UserMinus } from "lucide-react";
 import { useAppStore } from "../../store/app-store";
+import { getIMSDK } from "../../services/openim";
+import { SessionType } from "@openim/wasm-client-sdk";
 import { useState, useEffect } from "react";
 
 export default function UserProfile() {
@@ -9,6 +11,7 @@ export default function UserProfile() {
   const friends = useAppStore((s) => s.friends);
   const conversations = useAppStore((s) => s.conversations);
   const setActive = useAppStore((s) => s.setActiveConversation);
+  const refreshConversations = useAppStore((s) => s.refreshConversations);
   const currentUser = useAppStore((s) => s.currentUser);
   const setFriendRemark = useAppStore((s) => s.setFriendRemark);
   const deleteFriend = useAppStore((s) => s.deleteFriend);
@@ -23,7 +26,6 @@ export default function UserProfile() {
   const [remarkText, setRemarkText] = useState("");
   const [showDelete, setShowDelete] = useState(false);
   const [showBlackConfirm, setShowBlackConfirm] = useState(false);
-  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (id) loadOnlineStatus([id]);
@@ -39,10 +41,17 @@ export default function UserProfile() {
   const isBlacklisted = blackList.some((b: any) => b.userID === id);
   const conv = conversations.find((c) => c.conversationType === 1 && c.userID === id);
 
-  const handleChat = () => {
-    if (conv) {
-      setActive(conv.conversationID);
-      navigate(`/messages/session/${conv.conversationID}`);
+  const handleChat = async () => {
+    if (!id) return;
+    let conversationID = conv?.conversationID;
+    if (!conversationID) {
+      const result = await getIMSDK().getOneConversation({ sourceID: id, sessionType: SessionType.Single });
+      conversationID = result.data?.conversationID;
+      await refreshConversations();
+    }
+    if (conversationID) {
+      setActive(conversationID);
+      navigate(`/messages/session/${conversationID}`);
     }
   };
 
@@ -67,13 +76,7 @@ export default function UserProfile() {
     setShowBlackConfirm(false);
   };
 
-  const handleCopyID = () => {
-    if (id) {
-      navigator.clipboard.writeText(id);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
+
 
   return (
     <div className="flex-1 flex flex-col bg-gray-50">
@@ -116,11 +119,9 @@ export default function UserProfile() {
 
       {!isSelf && isFriend && (
         <div className="mt-2 bg-white px-6 py-4 flex gap-4 border-b border-gray-50">
-          <button onClick={handleChat} className="flex-1 py-3 bg-primary-50 text-primary-600 rounded-xl text-sm font-medium hover:bg-primary-100 transition-colors flex items-center justify-center gap-2">
+          <button onClick={handleChat} className="w-full py-3 bg-primary-50 text-primary-600 rounded-xl text-sm font-medium hover:bg-primary-100 transition-colors flex items-center justify-center gap-2">
             <MessageSquare size={18} /> 发消息
           </button>
-          <button onClick={() => navigate(`/messages`)} className="w-12 h-12 rounded-xl bg-gray-50 text-gray-500 hover:bg-gray-100 transition-colors flex items-center justify-center"><Phone size={18} /></button>
-          <button onClick={() => navigate(`/messages`)} className="w-12 h-12 rounded-xl bg-gray-50 text-gray-500 hover:bg-gray-100 transition-colors flex items-center justify-center"><Video size={18} /></button>
         </div>
       )}
 

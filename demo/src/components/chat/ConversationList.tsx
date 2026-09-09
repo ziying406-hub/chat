@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
-import { Search, Plus, Pin, BellOff, Trash2, MoreVertical, UserPlus, Users, UserSearch, Check, CheckCheck, CheckCircle, Circle, MessageSquare } from "lucide-react";
+import { Search, Plus, Pin, BellOff, Trash2, MoreVertical, UserPlus, Users, UserSearch, Check, CheckCheck, CheckCircle, Circle, Loader2 } from "lucide-react";
 import { useAppStore } from "../../store/app-store";
 import { formatTime } from "../../utils/format";
 import { SessionType } from "@openim/wasm-client-sdk";
@@ -8,6 +8,7 @@ import type { ConversationItem } from "../../services/openim";
 
 export default function ConversationList() {
   const conversations = useAppStore((s) => s.conversations);
+  const isInitialSyncing = useAppStore((s) => s.isInitialSyncing);
   const activeID = useAppStore((s) => s.activeConversationID);
   const setActive = useAppStore((s) => s.setActiveConversation);
   const pinConv = useAppStore((s) => s.pinConversation);
@@ -133,7 +134,13 @@ export default function ConversationList() {
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          {filtered.length === 0 && (
+          {filtered.length === 0 && isInitialSyncing && (
+            <div className="flex flex-col items-center justify-center py-20 text-gray-400 text-sm gap-2">
+              <Loader2 size={28} className="animate-spin text-primary-400" />
+              <span>正在同步聊天数据</span>
+            </div>
+          )}
+          {filtered.length === 0 && !isInitialSyncing && (
             <div className="flex flex-col items-center justify-center py-20 text-gray-300 text-sm gap-2">
               <Plus size={32} className="opacity-30" />
               <span>暂无会话</span>

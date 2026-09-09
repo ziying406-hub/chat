@@ -7,8 +7,6 @@ import InitialSetup from "./pages/InitialSetup";
 import Home from "./pages/Home";
 import MainLayout from "./components/layout/MainLayout";
 import { registerWebMCP } from "./webmcp";
-import Agreement from "./pages/Agreement";
-import Privacy from "./pages/Privacy";
 import { registerFCM } from "./services/openim";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {

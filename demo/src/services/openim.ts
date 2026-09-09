@@ -1,4 +1,4 @@
-import { getSDK, CbEvents, type WasmSdk } from "@openim/wasm-client-sdk";
+import { getSDK, CbEvents } from "@openim/wasm-client-sdk";
 import type {
   ConversationItem,
   MessageItem,
@@ -15,9 +15,9 @@ const WS_ADDR = "ws://localhost:10001";
 const CHAT_API = "http://localhost:10008";
 const PLATFORM_ID = 5;
 
-let sdk: WasmSdk | null = null;
+let sdk: ReturnType<typeof getSDK> | null = null;
 
-export function getIMSDK(): WasmSdk {
+export function getIMSDK(): ReturnType<typeof getSDK> {
   if (!sdk) {
     sdk = getSDK({
       coreWasmPath: "/openIM.wasm",
@@ -108,13 +108,17 @@ export async function sdkLogout(): Promise<void> {
 
 export function on<K extends keyof SdkEventDataMap>(event: K, handler: (data: SdkEventDataMap[K]) => void): () => void {
   const im = getIMSDK();
-  const listener = (data: { data: string }) => {
-    try {
-      const parsed = JSON.parse(data.data);
-      handler(parsed as SdkEventDataMap[K]);
-    } catch {
-      handler({} as SdkEventDataMap[K]);
+  const listener = (payload: { data: unknown }) => {
+    const data = payload?.data;
+    if (typeof data === "string") {
+      try {
+        handler(JSON.parse(data) as SdkEventDataMap[K]);
+        return;
+      } catch {
+        // Some SDK events use plain string payloads.
+      }
     }
+    handler(data as SdkEventDataMap[K]);
   };
   im.on(event, listener);
   return () => im.off(event, listener);
@@ -148,4 +152,53 @@ export async function registerFCM(): Promise<void> {
   } catch (e: any) {
     console.warn("FCM registration skipped:", e?.message || e);
   }
+}
+
+// ---------- Change Password ----------
+
+export async function changePassword(params: {
+  userID: string;
+  oldPassword: string;
+  newPassword: string;
+}): Promise<void> {
+  const res = await fetch(`${CHAT_API}/account/change_password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", operationID: genOperationID() },
+    body: JSON.stringify({
+      userID: params.userID,
+      oldPassword: params.oldPassword,
+      newPassword: params.newPassword,
+    }),
+  });
+  const data = await res.json();
+  if (data.errCode !== 0) throw new Error(data.errMsg || "修改密码失败");
+}
+
+// ---------- Submit Feedback ----------
+
+export async function submitFeedback(params: {
+  contact: string;
+  content: string;
+  images?: string[];
+}): Promise<void> {
+  const res = await fetch(`${CHAT_API}/feedback`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", operationID: genOperationID() },
+    body: JSON.stringify(params),
+  });
+  const data = await res.json();
+  if (data.errCode !== 0) throw new Error(data.errMsg || "提交反馈失败");
+}
+
+export async function listFavorites(token: string): Promise<any[]> {
+  const res = await fetch(`${CHAT_API}/user/favorites/list`, { method: "POST", headers: { "Content-Type": "application/json", token, operationID: genOperationID() }, body: "{}" });
+  const data = await res.json();
+  if (data.errCode !== 0) throw new Error(data.errMsg || "获取收藏失败");
+  return data.data || [];
+}
+
+export async function saveFavorite(token: string, favorite: any): Promise<void> {
+  const res = await fetch(`${CHAT_API}/user/favorites/save`, { method: "POST", headers: { "Content-Type": "application/json", token, operationID: genOperationID() }, body: JSON.stringify(favorite) });
+  const data = await res.json();
+  if (data.errCode !== 0) throw new Error(data.errMsg || "收藏失败");
 }

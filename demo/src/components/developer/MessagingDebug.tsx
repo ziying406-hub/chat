@@ -81,7 +81,7 @@ export default function MessagingDebug() {
         conversationID,
         startClientMsgID: "",
         count: 20,
-        lastMinSeq: 0,
+        viewType: 0,
       });
       logger.info("Messages:", res);
       setResponse(JSON.stringify(res, null, 2));

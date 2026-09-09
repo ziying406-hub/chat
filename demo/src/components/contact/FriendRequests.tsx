@@ -1,8 +1,9 @@
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Check, X, QrCode, ScanLine, Share2 } from "lucide-react";
 import { useAppStore } from "../../store/app-store";
+import { getIMSDK } from "../../services/openim";
 import { ApplicationHandleResult } from "@openim/wasm-client-sdk";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export default function FriendRequests() {
   const navigate = useNavigate();
@@ -25,10 +26,8 @@ export default function FriendRequests() {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      const { getIMSDK } = await import("../../services/openim");
       const im = getIMSDK();
-      const res = await im.getFriendApplicationListAsRecipient();
-      const { useAppStore } = await import("../../store/app-store");
+      const res = await im.getFriendApplicationListAsRecipient({ handleResults: [], offset: 0, count: 100 });
       useAppStore.setState({ friendRequests: res.data || [] });
       const frRes = await im.getFriendList();
       useAppStore.setState({ friends: frRes.data || [] });
@@ -37,7 +36,7 @@ export default function FriendRequests() {
   };
 
   // Auto-refresh on mount
-  useState(() => { handleRefresh(); });
+  useEffect(() => { void handleRefresh(); }, []);
 
   const handleAdd = async () => {
     if (!addUserID.trim()) return;
@@ -117,8 +116,8 @@ export default function FriendRequests() {
             </div>
             {r.handleResult === ApplicationHandleResult.Unprocessed ? (
               <div className="flex gap-2">
-                <button onClick={() => accept(r.fromUserID)} className="w-9 h-9 rounded-lg bg-primary-50 text-primary-500 hover:bg-primary-100 transition-colors flex items-center justify-center"><Check size={18} /></button>
-                <button onClick={() => reject(r.fromUserID)} className="w-9 h-9 rounded-lg bg-gray-50 text-gray-400 hover:bg-gray-100 transition-colors flex items-center justify-center"><X size={18} /></button>
+                <button aria-label={`同意 ${r.fromNickname || r.fromUserID}`} onClick={() => accept(r.fromUserID)} className="w-9 h-9 rounded-lg bg-primary-50 text-primary-500 hover:bg-primary-100 transition-colors flex items-center justify-center"><Check size={18} /></button>
+                <button aria-label={`拒绝 ${r.fromNickname || r.fromUserID}`} onClick={() => reject(r.fromUserID)} className="w-9 h-9 rounded-lg bg-gray-50 text-gray-400 hover:bg-gray-100 transition-colors flex items-center justify-center"><X size={18} /></button>
               </div>
             ) : (
               <span className={`text-xs px-3 py-1 rounded-full ${r.handleResult === ApplicationHandleResult.Accepted ? "bg-green-50 text-green-500" : "bg-gray-100 text-gray-400"}`}>

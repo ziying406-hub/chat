@@ -26,7 +26,7 @@ export default function SearchUser() {
         isSearchNickname: true,
         isSearchRemark: true,
       } as any);
-      setResults(res.data?.searchResultItems || res.data || []);
+      setResults(res.data || []);
     } catch (e) {
       console.error("searchFriends:", e);
       setResults([]);

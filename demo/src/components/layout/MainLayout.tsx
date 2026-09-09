@@ -3,6 +3,9 @@ import { MessageSquare, Users, Settings as SettingsIcon } from "lucide-react";
 import { useAppStore } from "../../store/app-store";
 import ConversationList from "../chat/ConversationList";
 import ChatView from "../chat/ChatView";
+import ConversationSettings from "../chat/ConversationSettings";
+import ConversationMedia from "../chat/ConversationMedia";
+import ConversationSearch from "../chat/ConversationSearch";
 import ContactList from "../contact/ContactList";
 import UserProfile from "../contact/UserProfile";
 import GroupList from "../contact/GroupList";
@@ -18,10 +21,20 @@ import Settings from "../settings/Settings";
 import ProfileEdit from "../settings/ProfileEdit";
 import GeneralSettings from "../settings/GeneralSettings";
 import PrivacySettings from "../settings/PrivacySettings";
+import SecuritySettings from "../settings/SecuritySettings";
+import NotificationSettings from "../settings/NotificationSettings";
+import MessagingSettings from "../settings/MessagingSettings";
+import MyEmojis from "../settings/MyEmojis";
+import BatchMessageAssistant from "../settings/BatchMessageAssistant";
+import BatchMessageCreate from "../settings/BatchMessageCreate";
+import BatchMessagePreview from "../settings/BatchMessagePreview";
+import Collections from "../settings/Collections";
+import CollectionDetail from "../settings/CollectionDetail";
 import Blacklist from "../settings/Blacklist";
 import ChangePassword from "../settings/ChangePassword";
 import AboutUs from "../settings/AboutUs";
-import CallOverlay from "../call/CallOverlay";
+import FeedbackPage from "../settings/FeedbackPage";
+import DebugInfo from "../settings/DebugInfo";
 import EmptyState from "../chat/EmptyState";
 import MessagingDebug from "../developer/MessagingDebug";
 import Logs from "../developer/Logs";
@@ -72,6 +85,9 @@ export default function MainLayout() {
         <Route path="/messages" element={<ConversationList />}>
           <Route index element={<EmptyState />} />
           <Route path="session/:id" element={<ChatView />} />
+          <Route path="session/:id/settings" element={<ConversationSettings />} />
+          <Route path="session/:id/settings/media" element={<ConversationMedia />} />
+          <Route path="session/:id/settings/search" element={<ConversationSearch />} />
           <Route path="groups/admin/:id" element={<GroupAdmin />} />
         </Route>
         <Route path="/contact" element={<ContactList />}>
@@ -89,9 +105,20 @@ export default function MainLayout() {
           <Route index element={<div className="flex-1 flex items-center justify-center text-gray-300 text-sm">选择一个设置项</div>} />
           <Route path="profile" element={<ProfileEdit />} />
           <Route path="general" element={<GeneralSettings />} />
+          <Route path="notifications" element={<NotificationSettings />} />
+          <Route path="messaging" element={<MessagingSettings />} />
+          <Route path="messaging/batch" element={<BatchMessageAssistant />} />
+          <Route path="messaging/emojis" element={<MyEmojis />} />
+          <Route path="messaging/batch/create" element={<BatchMessageCreate />} />
+          <Route path="messaging/batch/:id" element={<BatchMessagePreview />} />
           <Route path="privacy" element={<PrivacySettings />} />
+          <Route path="security" element={<SecuritySettings />} />
+          <Route path="collections" element={<Collections />} />
+          <Route path="collections/:id" element={<CollectionDetail />} />
           <Route path="blacklist" element={<Blacklist />} />
           <Route path="change-password" element={<ChangePassword />} />
+          <Route path="feedback" element={<FeedbackPage />} />
+          <Route path="debug" element={<DebugInfo />} />
           <Route path="about" element={<AboutUs />} />
         </Route>
         <Route path="/home" element={<Home />} />
@@ -101,7 +128,6 @@ export default function MainLayout() {
         <Route path="*" element={<Navigate to="/messages" replace />} />
       </Routes>
 
-      <CallOverlay />
 
       <div className="mobile-tabbar">
         <NavButton icon={<MessageSquare size={22} />} label="消息" path="/messages" active={isActive("/messages")} badge={totalUnread} />

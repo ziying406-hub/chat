@@ -17,8 +17,8 @@ export default function SearchGroup() {
     setSearched(true);
     try {
       const im = getIMSDK();
-      const res = await im.searchGroups({ keywordList: [keyword.trim()] } as any);
-      setResults(res.data?.searchResultItems || res.data || []);
+      const res = await im.searchGroups({ keywordList: [keyword.trim()], isSearchGroupID: true, isSearchGroupName: true });
+      setResults(res.data || []);
     } catch (e) {
       console.error("searchGroups:", e);
       setResults([]);
@@ -52,46 +52,16 @@ export default function SearchGroup() {
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        {searching && (
-          <div className="flex items-center justify-center py-20 text-gray-400 text-sm gap-2">
-            <Loader2 size={20} className="animate-spin" />
-            <span>搜索中...</span>
-          </div>
-        )}
-        {!searching && searched && results.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-20 text-gray-300 text-sm gap-2">
-            <Search size={28} className="opacity-30" />
-            <span>未找到群组</span>
-          </div>
-        )}
+        {searching && <div className="flex items-center justify-center py-20 text-gray-400 text-sm gap-2"><Loader2 size={20} className="animate-spin" /><span>搜索中...</span></div>}
+        {!searching && searched && results.length === 0 && <div className="flex flex-col items-center justify-center py-20 text-gray-300 text-sm gap-2"><Search size={28} className="opacity-30" /><span>未找到群组</span></div>}
         {!searching && results.map((g: any, idx) => {
           const groupID = g.groupID || "";
           const groupName = g.groupName || "未知群组";
           const memberCount = g.memberCount ?? g.groupMemberCount ?? 0;
           const faceURL = g.faceURL || "";
-          return (
-            <div
-              key={groupID || idx}
-              onClick={() => navigate(`/contact/group/${groupID}`)}
-              className="bg-white px-5 py-4 border-b border-gray-50 flex items-center gap-3 cursor-pointer hover:bg-gray-50 transition-colors"
-            >
-              <img src={faceURL || `https://api.dicebear.com/7.x/identicon/svg?seed=${groupID}`} alt="" className="w-12 h-12 rounded-xl object-cover bg-gray-100" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-800">{groupName}</p>
-                <p className="text-xs text-gray-400 mt-0.5">{memberCount} 人</p>
-              </div>
-              <button className="px-3 py-1.5 bg-primary-50 text-primary-500 rounded-lg text-sm hover:bg-primary-100 transition-colors">
-                查看
-              </button>
-            </div>
-          );
+          return <div key={groupID || idx} onClick={() => navigate(`/contact/group/${groupID}`)} className="bg-white px-5 py-4 border-b border-gray-50 flex items-center gap-3 cursor-pointer hover:bg-gray-50 transition-colors"><img src={faceURL || `https://api.dicebear.com/7.x/identicon/svg?seed=${groupID}`} alt="" className="w-12 h-12 rounded-xl object-cover bg-gray-100" /><div className="flex-1 min-w-0"><p className="text-sm font-medium text-gray-800">{groupName}</p><p className="text-xs text-gray-400 mt-0.5">{memberCount} 人</p></div><button className="px-3 py-1.5 bg-primary-50 text-primary-500 rounded-lg text-sm hover:bg-primary-100 transition-colors">查看</button></div>;
         })}
-        {!searching && !searched && (
-          <div className="flex flex-col items-center justify-center py-20 text-gray-300 text-sm gap-2">
-            <Search size={28} className="opacity-30" />
-            <span>输入群名称开始搜索</span>
-          </div>
-        )}
+        {!searching && !searched && <div className="flex flex-col items-center justify-center py-20 text-gray-300 text-sm gap-2"><Search size={28} className="opacity-30" /><span>输入群名称开始搜索</span></div>}
       </div>
     </div>
   );

@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, CheckCircle2 } from "lucide-react";
+import { useAppStore } from "../../store/app-store";
+import { getUserStorageKey } from "../../utils/storage";
 
 type Category = "bug" | "suggestion" | "other";
 
@@ -13,14 +15,16 @@ interface FeedbackItem {
 
 export default function Feedback() {
   const navigate = useNavigate();
+  const userID = useAppStore((state) => state.currentUser?.userID);
   const [category, setCategory] = useState<Category>("bug");
   const [description, setDescription] = useState("");
   const [contact, setContact] = useState("");
   const [showToast, setShowToast] = useState(false);
 
   const handleSubmit = () => {
-    if (!description.trim()) return;
-    const stored = JSON.parse(localStorage.getItem("99chat_feedback") || "[]");
+    if (!description.trim() || !userID) return;
+    const storageKey = getUserStorageKey("99chat_feedback", userID);
+    const stored = JSON.parse(localStorage.getItem(storageKey) || "[]");
     const item: FeedbackItem = {
       category,
       description: description.trim(),
@@ -28,7 +32,7 @@ export default function Feedback() {
       time: new Date().toISOString(),
     };
     stored.push(item);
-    localStorage.setItem("99chat_feedback", JSON.stringify(stored));
+    localStorage.setItem(storageKey, JSON.stringify(stored));
     setShowToast(true);
     setDescription("");
     setContact("");

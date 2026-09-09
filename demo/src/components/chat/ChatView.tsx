@@ -1,16 +1,18 @@
 import { Fragment, useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
-  Phone, Video, MoreVertical, Smile, Paperclip, Send, Image as ImageIcon, Mic,
-  ArrowLeft, RotateCcw, Copy, Trash2, Forward, Reply, Check, CheckCheck,
+  Video, MoreVertical, Smile, Paperclip, Send, Image as ImageIcon, Mic,
+  ArrowLeft, RotateCcw, Copy, Forward, Reply, Check, CheckCheck,
   Play, Pause, X, Search, Contact, UserPlus, BellOff, Star,
-  Camera, Bookmark, Flag, CheckSquare, Square,
+  Camera, MapPin, Settings, CheckSquare, Square,
 } from "lucide-react";
 import { useAppStore } from "../../store/app-store";
 import { formatMessageDate, formatTime, isSameCalendarDay } from "../../utils/format";
+import { getFavoritesStorageKey } from "../../utils/favorites";
+import { createCollectionItem } from "../../utils/collections";
 import { getUserStorageKey } from "../../utils/storage";
+import { saveFavorite } from "../../services/openim";
 import { SessionType, MessageType } from "@openim/wasm-client-sdk";
-import { startCall } from "../call/CallOverlay";
 import MediaViewer from "../chat/media/MediaViewer";
 import EmojiPicker from "./EmojiPicker";
 
@@ -27,8 +29,11 @@ export default function ChatView() {
   const sendSound = useAppStore((s) => s.sendSoundMessage);
   const sendFile = useAppStore((s) => s.sendFileMessage);
   const sendVideo = useAppStore((s) => s.sendVideoMessage);
+  const sendLocation = useAppStore((s) => s.sendLocationMessage);
   const forwardMsg = useAppStore((s) => s.forwardMessage);
+  const forwardMergedMessages = useAppStore((s) => s.forwardMergedMessages);
   const markRead = useAppStore((s) => s.markRead);
+  const deleteMessagesFromLocalStorage = useAppStore((s) => s.deleteMessagesFromLocalStorage);
   const revokeMsg = useAppStore((s) => s.revokeMessage);
   const groupMembers = useAppStore((s) => s.groupMembersMap);
   const loadGroupMembers = useAppStore((s) => s.loadGroupMembers);
@@ -44,6 +49,8 @@ export default function ChatView() {
   const drafts = useAppStore((s) => s.drafts);
   const setDraft = useAppStore((s) => s.setDraft);
   const clearDraft = useAppStore((s) => s.clearDraft);
+  const favoritesKey = currentUser ? getFavoritesStorageKey(currentUser.userID) : null;
+  const chatToken = useAppStore((s) => s.authData?.chatToken);
 
   const [input, setInput] = useState("");
   const [showMenu, setShowMenu] = useState(false);
@@ -65,14 +72,12 @@ export default function ChatView() {
   const [showInvite, setShowInvite] = useState(false);
   const [showForward, setShowForward] = useState(false);
   const [forwardMsgData, setForwardMsgData] = useState<any | null>(null);
+  const [forwardMergeData, setForwardMergeData] = useState<any[] | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [multiSelect, setMultiSelect] = useState(false);
   const [selectedMsgs, setSelectedMsgs] = useState<Set<string>>(new Set());
   const [showFavorites, setShowFavorites] = useState(false);
   const [dismissedAnnouncement, setDismissedAnnouncement] = useState("");
-  const [showReport, setShowReport] = useState<any | null>(null);
-  const [reportReason, setReportReason] = useState("");
-  const [recCancel, setRecCancel] = useState(false);
   const [recPulse, setRecPulse] = useState(0);
   const imageFileRef = useRef<HTMLInputElement>(null);
   const docFileRef = useRef<HTMLInputElement>(null);
@@ -243,6 +248,26 @@ export default function ChatView() {
     e.target.value = "";
   };
 
+  const handleLocation = () => {
+    if (!id) return;
+    if (!navigator.geolocation) {
+      showToast("当前浏览器不支持定位");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords }) => {
+        try {
+          await sendLocation(id, coords.latitude, coords.longitude, "我的位置");
+          setShowAttachMenu(false);
+        } catch {
+          showToast("位置发送失败");
+        }
+      },
+      () => showToast("无法获取位置，请检查定位权限"),
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 },
+    );
+  };
+
   const handleCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
@@ -282,7 +307,6 @@ export default function ChatView() {
       mediaRecorderRef.current = recorder;
       setRecording(true);
       setRecDuration(0);
-      setRecCancel(false);
       setRecPulse(0);
       recTimerRef.current = setInterval(() => setRecDuration((d) => d + 1), 1000);
       recPulseRef.current = setInterval(() => setRecPulse((p) => (p + 1) % 4), 300);
@@ -325,24 +349,34 @@ export default function ChatView() {
     const msgs = messages.filter((m: any) => selectedMsgs.has(m.clientMsgID));
     if (msgs.length === 1) {
       setForwardMsgData(msgs[0]);
+      setForwardMergeData(null);
       setShowForward(true);
-    } else {
-      showToast("请选择单条消息转发");
+    } else if (msgs.length > 1) {
+      setForwardMsgData(null);
+      setForwardMergeData(msgs);
+      setShowForward(true);
     }
     setMultiSelect(false);
     setSelectedMsgs(new Set());
   };
 
-  const handleBatchDelete = () => {
-    setSelectedMsgs(new Set());
-    setMultiSelect(false);
-    showToast("已删除选中消息");
+  const handleBatchDelete = async () => {
+    if (!id || selectedMsgs.size === 0) return;
+    try {
+      await deleteMessagesFromLocalStorage(id, [...selectedMsgs]);
+      showToast("已从本机删除选中消息");
+    } catch {
+      showToast("删除消息失败");
+    } finally {
+      setSelectedMsgs(new Set());
+      setMultiSelect(false);
+    }
   };
 
   // Collect all images for media viewer
   const allImages = messages
     .filter((m: any) => m.contentType === MessageType.PictureMessage)
-    .map((m: any) => ({ url: m.pictureElem?.sourcePath || m.pictureElem?.snapshotPath || m.pictureElem?.bigPicture?.url || "", name: m.clientMsgID }))
+    .map((m: any) => ({ url: m.pictureElem?.sourcePicture?.url || m.pictureElem?.bigPicture?.url || m.pictureElem?.snapshotPicture?.url || m.pictureElem?.sourcePath || "", name: m.clientMsgID }))
     .filter((img: any) => img.url);
 
   return (
@@ -355,13 +389,8 @@ export default function ChatView() {
           {isGroup && groupMembers[conv.groupID] && <span className="text-xs text-gray-400">({groupMembers[conv.groupID].length})</span>}
         </div>
         <div className="flex items-center gap-2 relative">
-          {!isGroup && (
-            <>
-              <button onClick={() => startCall("audio", conv.showName || "", peerUser?.faceURL || conv.faceURL || "", conv.conversationID)} className="w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-500"><Phone size={18} /></button>
-              <button onClick={() => startCall("video", conv.showName || "", peerUser?.faceURL || conv.faceURL || "", conv.conversationID)} className="w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-500"><Video size={18} /></button>
-            </>
-          )}
-          <button onClick={() => setShowMenu(!showMenu)} className="w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-500"><MoreVertical size={18} /></button>
+          <button aria-label="更多聊天操作" onClick={() => setShowMenu(!showMenu)} className="w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-500"><MoreVertical size={18} /></button>
+          <button aria-label="聊天设置" onClick={() => navigate(`/messages/session/${id}/settings`)} className="w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-500"><Settings size={18} /></button>
           {showMenu && (
             <div className="absolute right-5 top-14 z-50 bg-white rounded-xl shadow-xl border border-gray-100 py-1 w-40 text-sm" onClick={() => setShowMenu(false)}>
               <button onClick={() => { setShowSearch(!showSearch); if (!showSearch) setTimeout(() => searchInputRef.current?.focus(), 100); }} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><Search size={14} /> 搜索消息</button>
@@ -494,7 +523,7 @@ export default function ChatView() {
               {dateDivider}
               <div ref={(el) => { msgRefs.current[msg.clientMsgID] = el; }} onContextMenu={(e) => { e.preventDefault(); if (!multiSelect) setContextMsg(msg.clientMsgID); }} className={`flex items-start gap-2 ${self ? "flex-row-reverse" : "flex-row"} ${showAvatar ? "mt-3" : "mt-0.5"}`}>
                 {multiSelect && (
-                  <button onClick={() => toggleSelect(msg.clientMsgID)} className="flex-shrink-0 mt-1">
+                  <button aria-label={`选择消息 ${msg.clientMsgID}`} onClick={() => toggleSelect(msg.clientMsgID)} className="flex-shrink-0 mt-1">
                     {selectedMsgs.has(msg.clientMsgID)
                       ? <CheckSquare size={20} className="text-primary-500" />
                       : <Square size={20} className="text-gray-300" />}
@@ -510,13 +539,17 @@ export default function ChatView() {
                     {type === MessageType.TextMessage && (
                       <div className={`px-3.5 py-2.5 rounded-2xl text-sm break-words ${self ? "bg-primary-500 text-white rounded-tr-md" : "bg-white text-gray-700 rounded-tl-md shadow-sm"}`}>{msg.textElem?.content || ""}</div>
                     )}
+                    {/* @ mention message */}
+                    {type === MessageType.AtTextMessage && <div data-message-type="at-text" className={`px-3.5 py-2.5 rounded-2xl text-sm break-words ${self ? "bg-primary-500 text-white rounded-tr-md" : "bg-white text-gray-700 rounded-tl-md shadow-sm"}`}>{msg.atTextElem?.text || ""}</div>}
+
                     {/* Image */}
                     {type === MessageType.PictureMessage && (() => {
                       const pic = msg.pictureElem;
-                      const imgUrl = pic?.sourcePath || pic?.snapshotPath || pic?.bigPicture?.url || "";
+                      const imgUrl = pic?.sourcePicture?.url || pic?.bigPicture?.url || pic?.snapshotPicture?.url || pic?.sourcePath || "";
                       if (!imgUrl) return <div className="px-3 py-2 bg-gray-100 rounded-xl text-xs text-gray-400">图片加载中...</div>;
                       return (
                         <img
+                          data-message-type="image"
                           src={imgUrl}
                           alt=""
                           className="max-w-[240px] max-h-[200px] rounded-xl cursor-pointer object-cover"
@@ -542,11 +575,19 @@ export default function ChatView() {
                       );
                     })()}
 
+                    {/* Quote message */}
+                    {type === MessageType.QuoteMessage && (() => {
+                      const quote = msg.quoteElem;
+                      const original = quote?.quoteMessage;
+                      const originalText = original?.textElem?.content || original?.faceElem?.data || original?.fileElem?.fileName || "[消息]";
+                      return <div data-message-type="quote" className={`min-w-[180px] px-3.5 py-2.5 rounded-2xl text-sm ${self ? "bg-primary-500 text-white rounded-tr-md" : "bg-white text-gray-700 rounded-tl-md shadow-sm"}`}><p>{quote?.text || ""}</p><div className={`mt-2 border-l-2 pl-2 text-xs opacity-75 ${self ? "border-white/50" : "border-gray-300"}`}>{originalText}</div></div>;
+                    })()}
+
                     {/* Contact card */}
                     {type === MessageType.CustomMessage && msg.customElem?.extension === "contactCard" && (() => {
                       const card = JSON.parse(msg.customElem?.data || "{}");
                       return (
-                        <div className={`px-3 py-2.5 rounded-2xl ${self ? "bg-primary-500 text-white rounded-tr-md" : "bg-white text-gray-700 rounded-tl-md shadow-sm"}`}>
+                        <div data-message-type="contact-card" className={`px-3 py-2.5 rounded-2xl ${self ? "bg-primary-500 text-white rounded-tr-md" : "bg-white text-gray-700 rounded-tl-md shadow-sm"}`}>
                           <div className="flex items-center gap-2 min-w-[200px]">
                             <img src={card.faceURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${card.userID}`} alt="" className="w-10 h-10 rounded-lg object-cover bg-white/20" />
                             <div className="flex-1 min-w-0">
@@ -581,27 +622,32 @@ export default function ChatView() {
                     {/* File */}
                     {type === MessageType.FileMessage && (() => {
                       const fileElem = msg.fileElem;
-                      return (
-                        <div className={`flex items-center gap-3 px-3.5 py-2.5 rounded-2xl ${self ? "bg-primary-500 text-white rounded-tr-md" : "bg-white text-gray-700 rounded-tl-md shadow-sm"}`}>
-                          <Paperclip size={18} />
-                          <div>
-                            <p className="text-sm font-medium">{fileElem?.fileName || "文件"}</p>
-                            <p className="text-xs opacity-60">{fileElem ? Math.round((fileElem.fileSize || 0) / 1024) + "KB" : ""}</p>
-                          </div>
-                        </div>
-                      );
+                      const url = fileElem?.sourceUrl || fileElem?.filePath;
+                      const content = <><Paperclip size={18} /><div><p className="text-sm font-medium">{fileElem?.fileName || "文件"}</p><p className="text-xs opacity-60">{fileElem ? Math.round((fileElem.fileSize || 0) / 1024) + "KB" : ""}</p></div></>;
+                      const className = `flex items-center gap-3 px-3.5 py-2.5 rounded-2xl ${self ? "bg-primary-500 text-white rounded-tr-md" : "bg-white text-gray-700 rounded-tl-md shadow-sm"}`;
+                      return url ? <a data-message-type="file" href={url} download={fileElem?.fileName || ""} className={className}>{content}</a> : <div data-message-type="file" className={className}>{content}</div>;
+                    })()}
+                    {/* Merge message */}
+                    {type === MessageType.MergeMessage && (() => {
+                      const merged = msg.mergeElem;
+                      return <div className={`min-w-[220px] px-3.5 py-2.5 rounded-2xl text-sm ${self ? "bg-primary-500 text-white rounded-tr-md" : "bg-white text-gray-700 rounded-tl-md shadow-sm"}`}><p className="font-medium">{merged?.title || "聊天记录"}</p><div className="mt-2 space-y-1 text-xs opacity-80">{(merged?.abstractList || []).slice(0, 4).map((summary: string, index: number) => <p key={index} className="truncate">{summary}</p>)}</div></div>;
+                    })()}
+                    {/* Face message */}
+                    {type === MessageType.FaceMessage && (msg.faceElem?.data?.startsWith("http")
+                      ? <div data-message-type="face" className="p-1"><img src={msg.faceElem.data} alt="表情" className="w-20 h-20 object-contain" /></div>
+                      : <div data-message-type="face" className="px-2 py-1 text-3xl">{msg.faceElem?.data || "🙂"}</div>)}
+                    {/* Location */}
+                    {type === MessageType.LocationMessage && (() => {
+                      const location = msg.locationElem;
+                      const href = `https://www.google.com/maps?q=${location?.latitude},${location?.longitude}`;
+                      return <a href={href} target="_blank" rel="noreferrer" className={`flex items-center gap-2 px-3.5 py-2.5 rounded-2xl text-sm ${self ? "bg-primary-500 text-white rounded-tr-md" : "bg-white text-gray-700 rounded-tl-md shadow-sm"}`}><MapPin size={17} /><span>{location?.description || "我的位置"}</span></a>;
                     })()}
                     {/* Video */}
                     {type === MessageType.VideoMessage && (() => {
-                      const vidElem = msg.videoElem;
-                      return (
-                        <div className="relative cursor-pointer">
-                          {vidElem?.snapshotUrl && <img src={vidElem.snapshotUrl} alt="" className="max-w-[240px] max-h-[200px] rounded-xl object-cover" />}
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-xl">
-                            <div className="w-12 h-12 rounded-full bg-white/80 flex items-center justify-center"><Play size={24} className="text-gray-700 ml-1" /></div>
-                          </div>
-                        </div>
-                      );
+                      const video = msg.videoElem;
+                      const src = video?.videoUrl || video?.videoPath || "";
+                      if (!src) return <div className="px-3 py-2 bg-gray-100 rounded-xl text-xs text-gray-400">视频加载中...</div>;
+                      return <video controls preload="metadata" poster={video?.snapshotUrl || video?.snapshotPath || undefined} className="max-w-[320px] max-h-[240px] rounded-xl bg-black"><source src={src} type={video?.videoType || "video/mp4"} /></video>;
                     })()}
 
                     {/* Status */}
@@ -614,6 +660,7 @@ export default function ChatView() {
                         {msg.status === 3 && <span className="text-[10px] text-red-400">发送失败</span>}
                       </div>
                     )}
+                    <div className="mt-1 px-1 text-[10px] text-gray-400">{formatTime(msg.sendTime)}</div>
 
                     {/* Context menu */}
                     {contextMsg === msg.clientMsgID && (
@@ -621,30 +668,24 @@ export default function ChatView() {
                         <button onClick={() => { setQuoteMessage(msg); setContextMsg(null); }} className="w-full px-3 py-1.5 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><Reply size={12} /> 回复</button>
                         {type === MessageType.TextMessage && <button onClick={() => { navigator.clipboard?.writeText(msg.textElem?.content || ""); setContextMsg(null); }} className="w-full px-3 py-1.5 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><Copy size={12} /> 复制</button>}
                         <button onClick={() => { setForwardMsgData(msg); setShowForward(true); setContextMsg(null); }} className="w-full px-3 py-1.5 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><Forward size={12} /> 转发</button>
-                        <button onClick={() => {
+                        <button onClick={async () => {
+                          if (!favoritesKey) return;
+                          const favorite = createCollectionItem(msg, getSenderName(msg));
                           try {
-                            const raw = localStorage.getItem("99chat_favorites");
+                            const raw = localStorage.getItem(favoritesKey);
                             const favs = raw ? JSON.parse(raw) : [];
-                            favs.push({ clientMsgID: msg.clientMsgID, sendID: msg.sendID, content: msg.textElem?.content || "", contentType: msg.contentType, time: Date.now() });
-                            localStorage.setItem("99chat_favorites", JSON.stringify(favs));
+                            favs.push(favorite);
+                            localStorage.setItem(favoritesKey, JSON.stringify(favs));
                           } catch {}
-                          showToast("已收藏");
+                          try {
+                            if (!chatToken) throw new Error("token unavailable");
+                            await saveFavorite(chatToken, favorite);
+                            showToast("已收藏");
+                          } catch { showToast("收藏仅保存在本机，服务端暂不可用"); }
                           setContextMsg(null);
                         }} className="w-full px-3 py-1.5 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><Star size={12} /> 收藏</button>
-                        {self && canRevoke(msg) && <button onClick={() => { revokeMsg(id!, msg.clientMsgID); setContextMsg(null); }} className="w-full px-3 py-1.5 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><RotateCcw size={12} /> 撤回</button>}
-                        <button onClick={() => {
-                          try {
-                            const raw = localStorage.getItem("99chat_saved");
-                            const saved = raw ? JSON.parse(raw) : [];
-                            saved.push({ clientMsgID: msg.clientMsgID, sendID: msg.sendID, content: msg.textElem?.content || "", contentType: msg.contentType, time: Date.now() });
-                            localStorage.setItem("99chat_saved", JSON.stringify(saved));
-                          } catch {}
-                          showToast("已保存");
-                          setContextMsg(null);
-                        }} className="w-full px-3 py-1.5 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><Bookmark size={12} /> 保存</button>
-                        <button onClick={() => { setShowReport(msg); setContextMsg(null); }} className="w-full px-3 py-1.5 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><Flag size={12} /> 举报</button>
+                        {self && canRevoke(msg) && <button onClick={async () => { try { await revokeMsg(id!, msg.clientMsgID); } catch { showToast("撤回失败"); } finally { setContextMsg(null); } }} className="w-full px-3 py-1.5 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><RotateCcw size={12} /> 撤回</button>}
                         {self && !canRevoke(msg) && <button onClick={() => { setContextMsg(null); showToast("超过2分钟无法撤回"); }} className="w-full px-3 py-1.5 text-left hover:bg-gray-50 text-gray-300 flex items-center gap-2"><RotateCcw size={12} /> 撤回</button>}
-                        <button className="w-full px-3 py-1.5 text-left hover:bg-gray-50 text-red-400 flex items-center gap-2"><Trash2 size={12} /> 删除</button>
                       </div>
                     )}
                   </div>
@@ -708,13 +749,15 @@ export default function ChatView() {
           </div>
         ) : (
           <div className="flex items-center gap-2">
-            <button onClick={() => setShowEmoji(!showEmoji)} className={`hover:text-primary-500 ${showEmoji ? "text-primary-500" : "text-gray-400"}`}><Smile size={22} /></button>
-            <button onClick={() => setShowAttachMenu(!showAttachMenu)} className="text-gray-400 hover:text-primary-500 relative"><Paperclip size={22} /></button>
+            <button aria-label="表情" onClick={() => setShowEmoji(!showEmoji)} className={`hover:text-primary-500 ${showEmoji ? "text-primary-500" : "text-gray-400"}`}><Smile size={22} /></button>
+            <button aria-label="附件" onClick={() => setShowAttachMenu(!showAttachMenu)} className="text-gray-400 hover:text-primary-500 relative"><Paperclip size={22} /></button>
             {showAttachMenu && (
               <div className="absolute bottom-12 left-8 z-50 bg-white rounded-xl shadow-xl border border-gray-100 py-1 w-32 text-sm" onClick={() => setShowAttachMenu(false)}>
                 <button onClick={handleFileSelect} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><Paperclip size={14} /> 文件</button>
                 <button onClick={handleImageSelect} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><ImageIcon size={14} /> 图片</button>
+                <button onClick={handleVideoSelect} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><Video size={14} /> 视频</button>
                 <button onClick={handleCamera} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><Camera size={14} /> 拍照</button>
+                <button onClick={handleLocation} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><MapPin size={14} /> 发送位置</button>
                 <button onClick={() => { setShowFavorites(true); setShowAttachMenu(false); }} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><Star size={14} /> 收藏</button>
                 <button onClick={() => setShowContactPicker(true)} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><Contact size={14} /> 发送名片</button>
               </div>
@@ -762,11 +805,16 @@ export default function ChatView() {
               {friends.map((f) => (
                 <button
                   key={f.userID}
+                  aria-label={`发送 ${f.nickname || f.userID} 的名片`}
                   onClick={async () => {
                     if (!id) return;
-                    await sendContactCard(id, f.userID, f.nickname || f.userID, f.faceURL || "");
-                    setShowContactPicker(false);
-                    setShowAttachMenu(false);
+                    try {
+                      await sendContactCard(id, f.userID, f.nickname || f.userID, f.faceURL || "");
+                      setShowContactPicker(false);
+                      setShowAttachMenu(false);
+                    } catch {
+                      showToast("发送名片失败");
+                    }
                   }}
                   className="w-full flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors"
                 >
@@ -799,9 +847,13 @@ export default function ChatView() {
                   <button
                     key={f.userID}
                     onClick={async () => {
-                      await inviteToGroup(conv.groupID, [f.userID], "邀请加入群组");
-                      setShowInvite(false);
-                      showToast("邀请已发送");
+                      try {
+                        await inviteToGroup(conv.groupID, [f.userID], "邀请加入群组");
+                        setShowInvite(false);
+                        showToast("邀请已发送");
+                      } catch {
+                        showToast("邀请失败");
+                      }
                     }}
                     className="w-full flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors"
                   >
@@ -823,7 +875,7 @@ export default function ChatView() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setShowForward(false)}>
           <div className="bg-white rounded-2xl shadow-xl w-80 max-w-[90%] max-h-[60vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
-              <h3 className="text-base font-semibold text-gray-800">转发到</h3>
+              <h3 className="text-base font-semibold text-gray-800">{forwardMergeData ? "合并转发" : "转发到"}</h3>
               <button onClick={() => setShowForward(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
             </div>
             <div className="flex-1 overflow-y-auto">
@@ -833,13 +885,15 @@ export default function ChatView() {
                   key={c.conversationID}
                   onClick={async () => {
                     try {
-                      await forwardMsg(c.conversationID, forwardMsgData);
+                      if (forwardMergeData) await forwardMergedMessages(c.conversationID, forwardMergeData);
+                      else await forwardMsg(c.conversationID, forwardMsgData);
                       showToast("转发成功");
                     } catch {
                       showToast("转发失败");
                     }
                     setShowForward(false);
                     setForwardMsgData(null);
+                    setForwardMergeData(null);
                   }}
                   className="w-full flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors"
                 >
@@ -863,7 +917,8 @@ export default function ChatView() {
             <div className="flex-1 overflow-y-auto">
               {(() => {
                 try {
-                  const raw = localStorage.getItem("99chat_favorites");
+                  if (!favoritesKey) return <div className="flex items-center justify-center py-10 text-gray-300 text-sm">暂无收藏</div>;
+                  const raw = localStorage.getItem(favoritesKey);
                   const favs = raw ? JSON.parse(raw) : [];
                   if (favs.length === 0) return <div className="flex items-center justify-center py-10 text-gray-300 text-sm">暂无收藏</div>;
                   return favs.map((f: any) => (
@@ -874,37 +929,6 @@ export default function ChatView() {
                   ));
                 } catch { return <div className="flex items-center justify-center py-10 text-gray-300 text-sm">暂无收藏</div>; }
               })()}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Report modal */}
-      {showReport && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => { setShowReport(null); setReportReason(""); }}>
-          <div className="bg-white rounded-2xl shadow-xl w-80 max-w-[90%] p-5" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-base font-semibold text-gray-800">举报消息</h3>
-              <button onClick={() => { setShowReport(null); setReportReason(""); }} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
-            </div>
-            <textarea
-              value={reportReason}
-              onChange={(e) => setReportReason(e.target.value)}
-              placeholder="请输入举报原因..."
-              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm outline-none focus:border-primary-500 resize-none"
-              rows={4}
-            />
-            <div className="flex gap-2 mt-4">
-              <button onClick={() => { setShowReport(null); setReportReason(""); }} className="flex-1 py-2.5 bg-gray-50 text-gray-500 rounded-xl text-sm hover:bg-gray-100">取消</button>
-              <button
-                onClick={() => {
-                  if (!reportReason.trim()) { showToast("请输入举报原因"); return; }
-                  setShowReport(null);
-                  setReportReason("");
-                  showToast("举报已提交");
-                }}
-                className="flex-1 py-2.5 bg-red-500 text-white rounded-xl text-sm hover:bg-red-600"
-              >提交举报</button>
             </div>
           </div>
         </div>
