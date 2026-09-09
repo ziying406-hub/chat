@@ -38,7 +38,6 @@ export default function ChatView() {
   const groupMembers = useAppStore((s) => s.groupMembersMap);
   const loadGroupMembers = useAppStore((s) => s.loadGroupMembers);
   const sendQuote = useAppStore((s) => s.sendQuoteMessage);
-  const sendEmoticon = useAppStore((s) => s.sendEmoticonMessage);
   const sendAt = useAppStore((s) => s.sendAtMessage);
   const searchMsgs = useAppStore((s) => s.searchLocalMessages);
   const groups = useAppStore((s) => s.groups);
@@ -174,11 +173,6 @@ export default function ChatView() {
 
   const handleEmojiPick = (emoji: string) => {
     setInput(input + emoji);
-  };
-
-  const handleEmojiSend = async (emoji: string) => {
-    if (id) await sendEmoticon(id, emoji);
-    setShowEmoji(false);
   };
 
   const handleSearch = async () => {
@@ -728,7 +722,6 @@ export default function ChatView() {
         <EmojiPicker
           onPick={handleEmojiPick}
           onClose={() => setShowEmoji(false)}
-          onSend={handleEmojiSend}
         />
       )}
 

@@ -24,10 +24,16 @@ async function login(page, phone, password) {
   await sender.getByPlaceholder('输入消息...').waitFor({ state: 'visible', timeout: 15000 });
   await sender.getByRole('button', { name: '表情', exact: true }).click();
   await sender.getByText('😀', { exact: true }).first().click();
+  if (await sender.getByPlaceholder('输入消息...').inputValue() !== '😀') {
+    throw new Error('Emoji was not inserted into the input.');
+  }
+  console.log('Emoji inserted without sending.');
   await recipient.goto(`${BASE_URL}/#/messages/session/si_3004649357_3540424232`);
   await recipient.getByPlaceholder('输入消息...').waitFor({ state: 'visible', timeout: 15000 });
   await recipient.waitForTimeout(1800);
-  if (!await recipient.locator('[data-message-type="face"]').count()) { console.error(await recipient.locator('body').innerText()); throw new Error('Recipient did not receive a native OpenIM face message.'); }
-  console.log('Native face messages send and render through OpenIM.');
+  const beforeSend = await recipient.getByText('😀', { exact: true }).count();
+  await sender.getByPlaceholder('输入消息...').press('Enter');
+  await recipient.getByText('😀', { exact: true }).nth(beforeSend).waitFor({ state: 'visible', timeout: 15000 });
+  console.log('Emoji inserts into the input and sends only after confirmation.');
   await browser.close();
 })().catch((error) => { console.error(error); process.exit(1); });

@@ -25,10 +25,9 @@ const EMOJI_CATEGORIES: { name: string; emojis: string[] }[] = [
 interface EmojiPickerProps {
   onPick: (emoji: string) => void;
   onClose: () => void;
-  onSend?: (emoji: string) => void;
 }
 
-export default function EmojiPicker({ onPick, onClose, onSend }: EmojiPickerProps) {
+export default function EmojiPicker({ onPick, onClose }: EmojiPickerProps) {
   const currentUser = useAppStore((state) => state.currentUser);
   const customEmojis = getMyEmojis(currentUser?.userID);
   const categories = [...EMOJI_CATEGORIES, { name: "我的", emojis: customEmojis.map((emoji) => emoji.url) }];
@@ -52,9 +51,7 @@ export default function EmojiPicker({ onPick, onClose, onSend }: EmojiPickerProp
           ))}
         </div>
         <div className="flex items-center gap-2">
-          {onSend && (
-            <span className="text-xs text-gray-300">点击插入，长按或点发送大表情</span>
-          )}
+          <span className="text-xs text-gray-300">点击插入输入框</span>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <X size={16} />
           </button>
@@ -67,8 +64,8 @@ export default function EmojiPicker({ onPick, onClose, onSend }: EmojiPickerProp
             return (
               <button
                 key={`${emoji}-${i}`}
-                aria-label={customEmoji ? `发送 ${customEmoji.name}` : `发送 ${emoji}`}
-                onClick={() => onSend ? onSend(emoji) : onPick(emoji)}
+                aria-label={customEmoji ? `插入 ${customEmoji.name}` : `插入 ${emoji}`}
+                onClick={() => onPick(emoji)}
                 className="w-9 h-9 flex items-center justify-center text-xl rounded-lg hover:bg-gray-50 transition-colors overflow-hidden"
               >
                 {customEmoji ? <img src={customEmoji.url} alt={customEmoji.name} className="w-8 h-8 object-contain" /> : emoji}
