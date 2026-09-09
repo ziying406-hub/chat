@@ -19,6 +19,19 @@ export function formatTime(ts: number): string {
   }
 }
 
+export function isSameCalendarDay(first: number, second: number): boolean {
+  const firstDate = new Date(first);
+  const secondDate = new Date(second);
+  return firstDate.getFullYear() === secondDate.getFullYear()
+    && firstDate.getMonth() === secondDate.getMonth()
+    && firstDate.getDate() === secondDate.getDate();
+}
+
+export function formatMessageDate(ts: number): string {
+  const date = new Date(ts);
+  return `${date.getMonth() + 1}月${date.getDate()}日`;
+}
+
 export function formatDuration(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;

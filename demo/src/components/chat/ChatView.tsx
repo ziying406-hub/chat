@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { Fragment, useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Phone, Video, MoreVertical, Smile, Paperclip, Send, Image as ImageIcon, Mic,
@@ -7,7 +7,7 @@ import {
   Camera, Bookmark, Flag, CheckSquare, Square,
 } from "lucide-react";
 import { useAppStore } from "../../store/app-store";
-import { formatTime } from "../../utils/format";
+import { formatMessageDate, formatTime, isSameCalendarDay } from "../../utils/format";
 import { SessionType, MessageType } from "@openim/wasm-client-sdk";
 import { startCall } from "../call/CallOverlay";
 import MediaViewer from "../chat/media/MediaViewer";
@@ -176,7 +176,7 @@ export default function ChatView() {
   };
 
   const canRevoke = (msg: any) => {
-    return Date.now() - (msg.sendTime * 1000) < 120000;
+    return Date.now() - msg.sendTime < 120000;
   };
 
   const getSenderName = (msg: any) => {
@@ -420,6 +420,13 @@ export default function ChatView() {
           {messages.length === 0 && <div className="flex justify-center py-20 text-gray-300 text-sm">暂无消息，发送第一条消息吧</div>}
           {messages.map((msg: any, idx: number) => {
             const type = msg.contentType;
+            const previousMsg = idx > 0 ? messages[idx - 1] : null;
+            const showDateDivider = !previousMsg || !isSameCalendarDay(previousMsg.sendTime, msg.sendTime);
+            const dateDivider = showDateDivider && (
+              <div data-message-date-divider className="flex justify-center py-3">
+                <span className="text-xs text-gray-400">{formatMessageDate(msg.sendTime)}</span>
+              </div>
+            );
             // System notification messages (FriendAdded=1201, GroupCreated=1501, etc.)
             if (type >= 1000 && type !== MessageType.CustomMessage) {
               // Parse notification detail for friendly display
@@ -443,15 +450,15 @@ export default function ChatView() {
               else if (msg.notificationElem?.detail) {
                 try { displayText = JSON.parse(msg.notificationElem.detail).op || displayText; } catch {}
               }
-              return <div key={msg.clientMsgID} className='flex justify-center py-2'><span className='text-xs text-gray-400 bg-gray-200/50 px-3 py-1 rounded-full'>{displayText}</span></div>;
-              return <div key={msg.clientMsgID} className="flex justify-center py-2"><span className="text-xs text-gray-400 bg-gray-200/50 px-3 py-1 rounded-full">{msg.notificationElem?.detail || "[系统通知]"}</span></div>;
+              return <Fragment key={msg.clientMsgID}>{dateDivider}<div className='flex justify-center py-2'><span className='text-xs text-gray-400 bg-gray-200/50 px-3 py-1 rounded-full'>{displayText}</span></div></Fragment>;
             }
             const self = isSelf(msg);
-            const prevMsg = idx > 0 ? messages[idx - 1] : null;
-            const showAvatar = !prevMsg || prevMsg.sendID !== msg.sendID || (prevMsg as any).contentType >= 1000;
+            const showAvatar = !previousMsg || previousMsg.sendID !== msg.sendID || (previousMsg as any).contentType >= 1000;
 
             return (
-              <div key={msg.clientMsgID} ref={(el) => { msgRefs.current[msg.clientMsgID] = el; }} onContextMenu={(e) => { e.preventDefault(); if (!multiSelect) setContextMsg(msg.clientMsgID); }} className={`flex items-start gap-2 ${self ? "flex-row-reverse" : "flex-row"} ${showAvatar ? "mt-3" : "mt-0.5"}`}>
+              <Fragment key={msg.clientMsgID}>
+              {dateDivider}
+              <div ref={(el) => { msgRefs.current[msg.clientMsgID] = el; }} onContextMenu={(e) => { e.preventDefault(); if (!multiSelect) setContextMsg(msg.clientMsgID); }} className={`flex items-start gap-2 ${self ? "flex-row-reverse" : "flex-row"} ${showAvatar ? "mt-3" : "mt-0.5"}`}>
                 {multiSelect && (
                   <button onClick={() => toggleSelect(msg.clientMsgID)} className="flex-shrink-0 mt-1">
                     {selectedMsgs.has(msg.clientMsgID)
@@ -609,6 +616,7 @@ export default function ChatView() {
                   </div>
                 </div>
               </div>
+              </Fragment>
             );
           })}
           <div ref={msgEndRef} />
