@@ -21,6 +21,7 @@ const TEXT = `收藏验证-${Date.now()}`;
   await message.waitFor({ state: 'visible', timeout: 15000 });
   await message.click({ button: 'right' });
   await page.getByText('收藏', { exact: true }).click();
+  await page.getByText('已收藏', { exact: true }).waitFor({ state: 'visible', timeout: 15000 });
 
   await page.goto('http://localhost:5199/#/settings/collections');
   await page.waitForTimeout(600);
