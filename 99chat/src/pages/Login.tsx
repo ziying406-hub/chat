@@ -24,8 +24,8 @@ export default function Login() {
   const setAuthError = useAppStore((s) => s.setAuthError);
 
   const [tab, setTab] = useState<Tab>("login");
-  const [phone, setPhone] = useState("13800138000");
-  const [password, setPassword] = useState("test123456");
+  const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
   const [nickname, setNickname] = useState("");
   const [code, setCode] = useState("");
   const [showPwd, setShowPwd] = useState(false);
@@ -224,7 +224,6 @@ export default function Login() {
 
           {tab === "login" && (
             <div className="flex justify-between text-sm">
-              <span className="text-gray-400">默认账号: 13800138000 / test123456</span>
               <Link to="/auth/forgot-password" className="text-gray-400 hover:underline">忘记密码？</Link>
             </div>
           )}

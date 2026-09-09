@@ -11,6 +11,8 @@ import { registerFCM } from "./services/openim";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthed = useAppStore((s) => s.isAuthed);
+  const isSessionRestoring = useAppStore((s) => s.isSessionRestoring);
+  if (isSessionRestoring) return <div className="min-h-screen bg-gray-50" />;
   if (!isAuthed) return <Navigate to="/auth/sign-in" replace />;
   return <>{children}</>;
 }
@@ -18,11 +20,16 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 export default function App() {
   const isAuthed = useAppStore((s) => s.isAuthed);
   const darkMode = useAppStore((s) => s.darkMode);
+  const restoreSession = useAppStore((s) => s.restoreSession);
 
   const [pwaPrompt, setPwaPrompt] = useState<any>(null);
   const [showPwaBanner, setShowPwaBanner] = useState(false);
   const [showUpdateToast, setShowUpdateToast] = useState(false);
   const [showNotifDialog, setShowNotifDialog] = useState(false);
+
+  useEffect(() => {
+    restoreSession();
+  }, [restoreSession]);
 
   // PWA install prompt
   useEffect(() => {

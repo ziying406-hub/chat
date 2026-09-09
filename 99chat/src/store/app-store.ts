@@ -34,6 +34,24 @@ interface AuthData {
   userID: string;
 }
 
+const SESSION_STORAGE_KEY = "99chat_session";
+
+function saveSession(authData: AuthData) {
+  localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(authData));
+}
+
+function loadSession(): AuthData | null {
+  try {
+    const session = JSON.parse(localStorage.getItem(SESSION_STORAGE_KEY) || "null");
+    return session?.userID && session?.imToken && session?.chatToken ? session : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearSession() {
+  localStorage.removeItem(SESSION_STORAGE_KEY);
+}
 
 function saveAccountToLocal(authData: AuthData, nickname: string, faceURL: string, phoneNumber: string) {
   try {
@@ -48,6 +66,7 @@ function saveAccountToLocal(authData: AuthData, nickname: string, faceURL: strin
 interface AppState {
   isAuthed: boolean;
   isLoggingIn: boolean;
+  isSessionRestoring: boolean;
   isInitialSyncing: boolean;
   authError: string | null;
   currentUser: SelfUserInfo | null;
@@ -73,6 +92,7 @@ interface AppState {
   sendCode: (phone: string, areaCode?: string) => Promise<void>;
   register: (params: { phoneNumber: string; verifyCode: string; nickname: string; password: string; areaCode?: string }) => Promise<void>;
   login: (params: { phoneNumber: string; password: string; areaCode?: string }) => Promise<void>;
+  restoreSession: () => Promise<void>;
   logout: () => Promise<void>;
   setAuthError: (err: string | null) => void;
   setInitialSyncing: (isSyncing: boolean) => void;
@@ -257,6 +277,7 @@ export const useAppStore = create<AppState>()(
     return {
     isAuthed: false,
     isLoggingIn: false,
+    isSessionRestoring: true,
     isInitialSyncing: false,
     authError: null,
     currentUser: null,
@@ -291,6 +312,7 @@ export const useAppStore = create<AppState>()(
       try {
         set((s) => { s.isLoggingIn = true; s.authError = null; });
         const data = await registerUser(params);
+        saveSession(data);
         bindSDKListeners(getIMSDK());
         set((s) => { s.authData = data; s.isInitialSyncing = true; });
         await sdkLogin(data.userID, data.imToken);
@@ -299,6 +321,7 @@ export const useAppStore = create<AppState>()(
         const cu = get().currentUser;
         if (cu) saveAccountToLocal(data, cu.nickname || "", cu.faceURL || "", params.phoneNumber);
       } catch (e: any) {
+        clearSession();
         set((s) => { s.authError = e.message; s.isLoggingIn = false; });
         throw e;
       }
@@ -308,6 +331,7 @@ export const useAppStore = create<AppState>()(
       try {
         set((s) => { s.isLoggingIn = true; s.authError = null; });
         const data = await loginUser(params);
+        saveSession(data);
         bindSDKListeners(getIMSDK());
         set((s) => { s.authData = data; s.isInitialSyncing = true; });
         await sdkLogin(data.userID, data.imToken);
@@ -316,6 +340,7 @@ export const useAppStore = create<AppState>()(
         const cu = get().currentUser;
         if (cu) saveAccountToLocal(data, cu.nickname || "", cu.faceURL || "", params.phoneNumber);
       } catch (e: any) {
+        clearSession();
         set((s) => { s.authError = e.message; s.isLoggingIn = false; });
         throw e;
       }
@@ -323,6 +348,7 @@ export const useAppStore = create<AppState>()(
 
     logout: async () => {
       try { await sdkLogout(); } catch {}
+      clearSession();
       set((s) => {
         s.isAuthed = false;
         s.isInitialSyncing = false;
@@ -337,6 +363,26 @@ export const useAppStore = create<AppState>()(
         s.groupRequests = [];
         s.activeConversationID = null;
       });
+    },
+
+    restoreSession: async () => {
+      const data = loadSession();
+      if (!data) {
+        set((s) => { s.isSessionRestoring = false; });
+        return;
+      }
+      try {
+        bindSDKListeners(getIMSDK());
+        set((s) => { s.authData = data; s.isInitialSyncing = true; });
+        await sdkLogin(data.userID, data.imToken);
+        await get().loadAllData();
+        set((s) => { s.isAuthed = true; });
+      } catch {
+        clearSession();
+        set((s) => { s.authData = null; s.currentUser = null; });
+      } finally {
+        set((s) => { s.isInitialSyncing = false; s.isSessionRestoring = false; });
+      }
     },
 
     setAuthError: (err) => set((s) => { s.authError = err; }),
