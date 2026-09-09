@@ -4,3 +4,5 @@ dist/
 *.local
 .vite/
 openim-docker
+# Separately versioned source for the local 99chat favorites API image.
+99chat-chat-api/
