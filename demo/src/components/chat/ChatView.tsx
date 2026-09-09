@@ -346,7 +346,7 @@ export default function ChatView() {
     .filter((img: any) => img.url);
 
   return (
-    <div className="flex-1 flex flex-col h-full">
+    <div className="flex-1 min-w-0 flex flex-col h-full">
       {/* Header */}
       <div className="h-16 border-b border-gray-100 flex items-center justify-between px-5 bg-white">
         <div className="flex items-center gap-3">
@@ -382,7 +382,7 @@ export default function ChatView() {
       </div>
 
       {isGroup && groupAnnouncement && dismissedAnnouncement !== groupAnnouncement && (
-        <div data-group-announcement className="flex items-center gap-3 border-b border-amber-100 bg-amber-50 px-5 py-2.5 text-sm">
+        <div data-group-announcement className="flex min-w-0 max-w-full items-center gap-3 overflow-hidden border-b border-amber-100 bg-amber-50 px-5 py-2.5 text-sm">
           <button onClick={() => setShowAnnouncement(true)} className="flex h-6 min-w-0 flex-1 items-center overflow-hidden whitespace-nowrap text-left text-amber-900">
             <span className="mr-2 flex-shrink-0 font-medium">群公告</span>
             <span className="min-w-0 flex-1 truncate text-amber-800">{groupAnnouncement}</span>
