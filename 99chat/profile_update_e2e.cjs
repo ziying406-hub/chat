@@ -14,7 +14,11 @@ async function login(page) {
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage();
   await login(page);
-  await page.goto(`${BASE}/#/settings/profile`);
+  await page.goto(`${BASE}/#/settings`);
+  await page.waitForURL(/#\/settings\/profile$/, { timeout: 15000 });
+  await page.getByRole('button', { name: '二维码', exact: true }).click();
+  await page.getByAltText('我的二维码').waitFor({ state: 'visible', timeout: 15000 });
+  await page.getByRole('button', { name: '关闭', exact: true }).click();
   const nickname = page.locator('input:not([type="file"])').first();
   const signature = page.getByPlaceholder('设置签名');
   const originalNickname = await nickname.inputValue();
@@ -22,7 +26,7 @@ async function login(page) {
 
   await signature.fill(SIGNATURE);
   await page.getByRole('button', { name: '保存', exact: true }).click();
-  await page.waitForURL(/#\/settings$/, { timeout: 15000 });
+  await page.waitForURL(/#\/settings\/profile$/, { timeout: 15000 });
   await page.goto(`${BASE}/#/settings/profile`);
   await signature.waitFor({ state: 'visible', timeout: 15000 });
   if (await signature.inputValue() !== SIGNATURE) throw new Error('Updated profile signature was not persisted.');
@@ -30,7 +34,7 @@ async function login(page) {
   await nickname.fill(originalNickname);
   await signature.fill(originalSignature);
   await page.getByRole('button', { name: '保存', exact: true }).click();
-  await page.waitForURL(/#\/settings$/, { timeout: 15000 });
+  await page.waitForURL(/#\/settings\/profile$/, { timeout: 15000 });
   console.log('Profile updates persist through OpenIM and the original value is restored.');
   await browser.close();
 })().catch((error) => { console.error(error); process.exit(1); });

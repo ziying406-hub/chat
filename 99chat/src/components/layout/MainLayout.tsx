@@ -102,7 +102,7 @@ export default function MainLayout() {
           <Route path="search/group" element={<SearchGroup />} />
         </Route>
         <Route path="/settings" element={<Settings />}>
-          <Route index element={<div className="flex-1 flex items-center justify-center text-gray-300 text-sm">选择一个设置项</div>} />
+          <Route index element={<Navigate to="profile" replace />} />
           <Route path="profile" element={<ProfileEdit />} />
           <Route path="general" element={<GeneralSettings />} />
           <Route path="notifications" element={<NotificationSettings />} />
