@@ -1,0 +1,24 @@
+const { chromium } = require('playwright');
+const BASE = 'http://localhost:5199';
+const TEXT = `撤回验证-${Date.now()}`;
+(async () => {
+  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage();
+  await page.goto(`${BASE}/#/auth/sign-in`, { waitUntil: 'domcontentloaded' });
+  await page.getByPlaceholder('请输入手机号').fill('13800138000');
+  await page.getByPlaceholder('请输入密码').fill('test123456');
+  await page.getByRole('button', { name: '登录', exact: true }).click();
+  await page.waitForURL(/#\/messages/, { timeout: 60000 });
+  await page.goto(`${BASE}/#/messages/session/si_3004649357_3540424232`, { waitUntil: 'domcontentloaded' });
+  const input = page.getByPlaceholder('输入消息...');
+  await input.fill(TEXT);
+  await input.press('Enter');
+  const message = page.locator('.break-words').filter({ hasText: TEXT }).last();
+  await message.waitFor({ state: 'visible', timeout: 15000 });
+  await message.click({ button: 'right' });
+  await page.getByText('撤回', { exact: true }).click();
+  await message.waitFor({ state: 'detached', timeout: 15000 });
+  await page.getByText('消息已撤回', { exact: true }).last().waitFor({ state: 'visible', timeout: 15000 });
+  console.log('Message revocation calls OpenIM and replaces the text with a withdrawal notice.');
+  await browser.close();
+})().catch((error) => { console.error(error); process.exit(1); });

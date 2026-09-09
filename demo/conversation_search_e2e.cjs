@@ -1,0 +1,27 @@
+const { chromium } = require('playwright');
+const BASE = 'http://localhost:5199';
+const TEXT = `搜索验证-${Date.now()}`;
+(async () => {
+  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage();
+  await page.goto(`${BASE}/#/auth/sign-in`);
+  await page.getByPlaceholder('请输入手机号').fill('13800138000');
+  await page.getByPlaceholder('请输入密码').fill('test123456');
+  await page.getByRole('button', { name: '登录', exact: true }).click();
+  await page.waitForURL(/#\/messages/, { timeout: 60000 });
+  const conversation = page.locator('.cursor-pointer').filter({ hasText: 'suxia' }).first();
+  await conversation.waitFor({ state: 'visible', timeout: 90000 });
+  await conversation.click();
+  const composer = page.getByPlaceholder('输入消息...');
+  await composer.fill(TEXT);
+  await composer.press('Enter');
+  await page.getByText(TEXT, { exact: true }).waitFor({ state: 'visible', timeout: 15000 });
+  await page.getByRole('button', { name: '聊天设置', exact: true }).click();
+  await page.getByText('搜索聊天记录', { exact: true }).click();
+  const query = page.getByPlaceholder('搜索聊天记录');
+  await query.fill(TEXT);
+  await query.press('Enter');
+  await page.getByText(TEXT, { exact: true }).waitFor({ state: 'visible', timeout: 15000 });
+  console.log('Conversation search finds a real OpenIM local history message.');
+  await browser.close();
+})().catch((error) => { console.error(error); process.exit(1); });
