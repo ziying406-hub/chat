@@ -7,7 +7,7 @@ import {
   Camera, MapPin, Settings, CheckSquare, Square,
 } from "lucide-react";
 import { useAppStore } from "../../store/app-store";
-import { formatMessageDate, formatTime, isSameCalendarDay } from "../../utils/format";
+import { formatMessageDate, formatTime, formatVoiceDuration, isSameCalendarDay } from "../../utils/format";
 import { getFavoritesStorageKey } from "../../utils/favorites";
 import { createCollectionItem } from "../../utils/collections";
 import { getUserStorageKey } from "../../utils/storage";
@@ -564,13 +564,14 @@ export default function ChatView() {
                     {type === MessageType.VoiceMessage && (() => {
                       const sound = msg.soundElem;
                       const url = sound?.sourceUrl || "";
+                      const duration = formatVoiceDuration(sound?.duration);
                       return (
                         <button
                           onClick={() => url && playAudio(url)}
                           className={`flex items-center gap-2 px-3 py-2.5 rounded-2xl ${self ? "bg-primary-500 text-white rounded-tr-md" : "bg-white text-gray-700 rounded-tl-md shadow-sm"}`}
                         >
                           {playingAudio === url ? <Pause size={16} /> : <Play size={16} />}
-                          <span className="text-sm">{sound?.duration || 0}"</span>
+                          {duration && <span className="text-sm">{duration}</span>}
                         </button>
                       );
                     })()}

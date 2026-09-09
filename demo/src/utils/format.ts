@@ -37,3 +37,7 @@ export function formatDuration(seconds: number): string {
   const s = seconds % 60;
   return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
 }
+
+export function formatVoiceDuration(seconds: number | undefined): string {
+  return typeof seconds === "number" && seconds > 0 ? `${seconds}\"` : "";
+}
