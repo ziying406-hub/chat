@@ -1100,8 +1100,15 @@ export const useAppStore = create<AppState>()(
       try {
         await im.setGroupInfo({ groupID, ...info } as any);
         const groupRes = await im.getJoinedGroupList();
-        set((s) => { s.groups = groupRes.data || []; });
-      } catch (e) { console.error("setGroupInfo:", e); }
+        set((s) => {
+          s.groups = (groupRes.data || []).map((group) =>
+            group.groupID === groupID ? { ...group, ...info } : group,
+          );
+        });
+      } catch (e) {
+        console.error("setGroupInfo:", e);
+        throw e;
+      }
     },
 
     inviteToGroup: async (groupID, userIDs, reason) => {

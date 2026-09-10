@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft, Crown, Shield, UserPlus, UserMinus, VolumeX, LogOut, Check, X, Bell,
@@ -21,6 +21,7 @@ export default function GroupAdmin() {
   const loadGroupApps = useAppStore((s) => s.loadGroupApplications);
   const dismissGroup = useAppStore((s) => s.dismissGroup);
   const setGroupInfo = useAppStore((s) => s.setGroupInfo);
+  const uploadAvatar = useAppStore((s) => s.uploadAvatar);
   const muteMember = useAppStore((s) => s.muteGroupMember);
   const muteGroup = useAppStore((s) => s.muteGroup);
   const transferGroupOwner = useAppStore((s) => s.transferGroupOwner);
@@ -39,6 +40,10 @@ export default function GroupAdmin() {
   const [memberKeyword, setMemberKeyword] = useState("");
   const [memberResults, setMemberResults] = useState<typeof members | null>(null);
   const [searchingMembers, setSearchingMembers] = useState(false);
+  const avatarInput = useRef<HTMLInputElement>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [avatarError, setAvatarError] = useState("");
+  const [avatarSaved, setAvatarSaved] = useState(false);
 
   const group = groups.find((g) => g.groupID === id);
   const isOwner = group?.ownerUserID === currentUser?.userID;
@@ -64,6 +69,25 @@ export default function GroupAdmin() {
 
   const handleSave = async () => {
     await setGroupInfo(id!, { groupName, notification: announcement, introduction: intro });
+  };
+
+  const handleAvatarChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !isOwner || uploadingAvatar) return;
+    setAvatarError("");
+    setAvatarSaved(false);
+    setUploadingAvatar(true);
+    try {
+      const faceURL = await uploadAvatar(file);
+      if (!faceURL) throw new Error("头像上传失败，请重试");
+      await setGroupInfo(group.groupID, { faceURL });
+      setAvatarSaved(true);
+    } catch (error) {
+      setAvatarError(error instanceof Error ? error.message : "群头像更新失败，请重试");
+    } finally {
+      setUploadingAvatar(false);
+    }
   };
 
   const handleMute = async (member: typeof members[number]) => {
@@ -239,6 +263,20 @@ export default function GroupAdmin() {
         {/* Settings tab */}
         {tab === "settings" && (
           <div className="bg-white">
+            <div className="px-5 py-4 border-b border-gray-50">
+              <p className="text-sm text-gray-500 mb-3">群头像</p>
+              <div className="flex items-center gap-4">
+                <img src={group.faceURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${group.groupID}`} alt="群头像" className="w-16 h-16 rounded-2xl object-cover bg-gray-100" />
+                {isOwner ? (
+                  <>
+                    <button onClick={() => avatarInput.current?.click()} disabled={uploadingAvatar} className="px-4 py-2 rounded-lg bg-primary-50 text-primary-600 text-sm hover:bg-primary-100 disabled:opacity-50">{uploadingAvatar ? "上传中..." : "更换头像"}</button>
+                    <input ref={avatarInput} type="file" accept="image/*" aria-label="上传群头像" className="hidden" onChange={handleAvatarChange} />
+                  </>
+                ) : <span className="text-xs text-gray-400">仅群主可更换头像</span>}
+              </div>
+              {avatarError && <p role="alert" className="text-sm text-red-500 mt-2">{avatarError}</p>}
+              {avatarSaved && <p role="status" className="text-sm text-primary-600 mt-2">群头像已更新</p>}
+            </div>
             <div className="px-5 py-4 border-b border-gray-50">
               <label className="text-sm text-gray-500 block mb-1">群名称</label>
               <input value={groupName} onChange={(e) => setGroupName(e.target.value)} className="w-full px-3 py-2 bg-gray-50 rounded-lg text-sm outline-none focus:bg-white focus:ring-1 focus:ring-primary-200" />
