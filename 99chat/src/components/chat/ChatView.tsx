@@ -84,6 +84,7 @@ export default function ChatView() {
   const videoFileRef = useRef<HTMLInputElement>(null);
   const msgEndRef = useRef<HTMLDivElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -291,12 +292,14 @@ export default function ChatView() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream);
+      const startedAt = performance.now();
       audioChunksRef.current = [];
       recorder.ondataavailable = (e) => audioChunksRef.current.push(e.data);
       recorder.onstop = () => {
         const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
         const file = new File([blob], `voice_${Date.now()}.webm`, { type: "audio/webm" });
-        if (id) sendSound(id, file, recDuration);
+        const duration = Math.max(1, Math.round((performance.now() - startedAt) / 1000));
+        if (id) sendSound(id, file, duration);
         stream.getTracks().forEach((t) => t.stop());
       };
       recorder.start();
@@ -315,21 +318,33 @@ export default function ChatView() {
     if (send) {
       mediaRecorderRef.current?.stop();
     } else {
+      if (mediaRecorderRef.current) {
+        mediaRecorderRef.current.onstop = null;
+        mediaRecorderRef.current.stop();
+      }
       mediaRecorderRef.current?.stream?.getTracks().forEach((t) => t.stop());
     }
     setRecording(false);
     setRecDuration(0);
   };
 
-  const playAudio = (url: string) => {
+  const playAudio = async (url: string) => {
+    audioRef.current?.pause();
     if (playingAudio === url) {
       setPlayingAudio(null);
       return;
     }
     const audio = new Audio(url);
+    audioRef.current = audio;
     audio.onended = () => setPlayingAudio(null);
-    audio.play();
-    setPlayingAudio(url);
+    try {
+      await audio.play();
+      setPlayingAudio(url);
+    } catch (error) {
+      console.error("audio playback failed:", error);
+      setPlayingAudio(null);
+      showToast("语音播放失败，请重试");
+    }
   };
 
   const toggleSelect = (clientMsgID: string) => {

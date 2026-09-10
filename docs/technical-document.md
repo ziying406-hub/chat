@@ -726,6 +726,8 @@ if ('serviceWorker' in navigator) {
 
 ### 6.4 FCM 推送
 
+> 2026-09-10 生产验证：以下为接入流程，不是完成状态。当前前端加载 `firebase/messaging` 失败，关闭网页后的推送尚未完成联调；浏览器授予通知权限不能作为推送可用证据。详见 [生产验证记录](production-verification-2026-09-10.md)。
+
 ```
 Firebase Cloud Messaging 集成流程：
 
