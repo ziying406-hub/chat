@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import MobileBackButton from "../layout/MobileBackButton";
 import { Bell, Volume2, Vibrate } from "lucide-react";
 import { useAppStore } from "../../store/app-store";
 import { getUserStorageKey } from "../../utils/storage";
@@ -97,7 +98,8 @@ export default function NotificationSettings() {
 
   return (
     <div className="flex-1 flex flex-col bg-gray-50">
-      <div className="bg-white px-6 py-4 border-b border-gray-100">
+      <div className="mobile-page-heading bg-white px-6 py-4 border-b border-gray-100">
+        <MobileBackButton to="/settings" />
         <h2 className="text-lg font-bold text-gray-800">通知设置</h2>
       </div>
 

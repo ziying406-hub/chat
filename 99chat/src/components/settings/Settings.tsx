@@ -10,7 +10,7 @@ export default function Settings() {
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState("");
 
-  const isActive = (path: string) => location.pathname === path;
+  const isActive = (path: string) => location.pathname.replace(/\/+$/, "") === path;
 
   const menuItems = [
     { label: "我的收藏", path: "/settings/collections" },
@@ -23,7 +23,7 @@ export default function Settings() {
 
   return (
     <>
-      <div className="w-[320px] border-r border-gray-100 flex flex-col bg-white">
+      <div className={`list-panel w-[320px] border-r border-gray-100 flex flex-col bg-white ${isActive("/settings") ? "mobile-panel-active" : ""}`}>
         <div className="bg-primary-500 px-6 py-3.5">
           <h2 className="text-base font-semibold text-white">个人中心</h2>
         </div>
@@ -39,6 +39,7 @@ export default function Settings() {
           </h3>
           <div className="absolute right-4 top-8">
             <button
+              aria-label="编辑个人资料"
               onClick={() => navigate("/settings/profile")}
               className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-400"
             >
@@ -85,7 +86,7 @@ export default function Settings() {
           {logoutError && <p role="alert" className="px-5 py-2 text-sm text-red-500">{logoutError}</p>}
         </div>
       </div>
-      <Outlet />
+      <div className={`detail-panel ${!isActive("/settings") ? "mobile-panel-active" : ""}`}><Outlet /></div>
     </>
   );
 }

@@ -1,4 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
+import UnavailableDetail from "../layout/UnavailableDetail";
 import { ArrowLeft, MessageSquare, QrCode, Tag, Ban, UserMinus } from "lucide-react";
 import { useAppStore } from "../../store/app-store";
 import { getIMSDK } from "../../services/openim";
@@ -35,7 +36,7 @@ export default function UserProfile() {
   const isSelf = id === currentUser?.userID;
   const user = isSelf ? currentUser : friend;
 
-  if (!user) return <div className="flex-1 flex items-center justify-center text-gray-300">用户不存在</div>;
+  if (!user) return <UnavailableDetail to="/contact" label="返回通讯录">用户不存在</UnavailableDetail>;
 
   const isFriend = !!friend;
   const isBlacklisted = blackList.some((b: any) => b.userID === id);

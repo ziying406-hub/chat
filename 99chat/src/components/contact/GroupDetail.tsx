@@ -1,4 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
+import UnavailableDetail from "../layout/UnavailableDetail";
 import { useEffect, useState, useRef } from "react";
 import { ArrowLeft, Users, Volume2, LogOut, Crown, Shield, QrCode, Settings as SettingsIcon, Edit3, Trash2, X, Camera, ChevronDown } from "lucide-react";
 import { useAppStore } from "../../store/app-store";
@@ -39,7 +40,7 @@ export default function GroupDetail() {
     if (id) loadMembers(id);
   }, [id, groups]);
 
-  if (!group) return <div className="flex-1 flex items-center justify-center text-gray-300">群组不存在</div>;
+  if (!group) return <UnavailableDetail to="/contact/groups" label="返回群组列表">群组不存在</UnavailableDetail>;
 
   const needVerification = group?.needVerification ?? 0;
 

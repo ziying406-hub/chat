@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Outlet, useNavigate } from "react-router-dom";
+import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { Search, Plus, Pin, BellOff, Trash2, MoreVertical, UserPlus, Users, UserSearch, Check, CheckCheck, CheckCircle, Circle, Loader2 } from "lucide-react";
 import { useAppStore } from "../../store/app-store";
 import { formatTime } from "../../utils/format";
@@ -7,6 +7,7 @@ import { SessionType } from "@openim/wasm-client-sdk";
 import type { ConversationItem } from "../../services/openim";
 
 export default function ConversationList() {
+  const isRoot = useLocation().pathname.replace(/\/+$/, "") === "/messages";
   const conversations = useAppStore((s) => s.conversations);
   const isInitialSyncing = useAppStore((s) => s.isInitialSyncing);
   const activeID = useAppStore((s) => s.activeConversationID);
@@ -87,7 +88,7 @@ export default function ConversationList() {
 
   return (
     <>
-      <div className="w-[320px] border-r border-gray-100 flex flex-col bg-white">
+      <div className={`list-panel w-[320px] border-r border-gray-100 flex flex-col bg-white ${isRoot ? "mobile-panel-active" : ""}`}>
         <div className="px-4 pt-4 pb-2">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold text-gray-800">消息</h2>
@@ -242,7 +243,7 @@ export default function ConversationList() {
           })}
         </div>
       </div>
-      <Outlet />
+      <div className={`detail-panel ${!isRoot ? "mobile-panel-active" : ""}`}><Outlet /></div>
 
       {/* Delete confirmation */}
       {deleteConfirm && (

@@ -39,6 +39,11 @@ import EmptyState from "../chat/EmptyState";
 import MessagingDebug from "../developer/MessagingDebug";
 import Logs from "../developer/Logs";
 import Feedback from "../developer/Feedback";
+import { useIsMobile } from "../../hooks/useIsMobile";
+
+function SettingsIndex() {
+  return useIsMobile() ? null : <Navigate to="profile" replace />;
+}
 
 function NavButton({ icon, label, path, active, badge }: {
   icon: React.ReactNode; label: string; path: string; active: boolean; badge?: number;
@@ -68,9 +73,10 @@ export default function MainLayout() {
   const totalUnread = useAppStore((s) => s.totalUnread);
   const pendingRequests = useAppStore((s) => s.friendRequests.filter((r: any) => r.handleStatus === 0).length);
   const isActive = (prefix: string) => location.pathname.startsWith(prefix);
+  const isRoot = ["/messages", "/contact", "/settings"].includes(location.pathname.replace(/\/+$/, ""));
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-white">
+    <div className="app-shell flex h-screen w-full overflow-hidden bg-white">
       <div className="w-[72px] bg-gray-50 border-r border-gray-100 flex flex-col items-center py-4 gap-2 sidebar-nav">
         <NavButton icon={<MessageSquare size={22} />} label="消息" path="/messages" active={isActive("/messages")} badge={totalUnread} />
         <NavButton icon={<Users size={22} />} label="通讯录" path="/contact" active={isActive("/contact")} badge={pendingRequests} />
@@ -102,7 +108,7 @@ export default function MainLayout() {
           <Route path="search/group" element={<SearchGroup />} />
         </Route>
         <Route path="/settings" element={<Settings />}>
-          <Route index element={<Navigate to="profile" replace />} />
+          <Route index element={<SettingsIndex />} />
           <Route path="profile" element={<ProfileEdit />} />
           <Route path="general" element={<GeneralSettings />} />
           <Route path="notifications" element={<NotificationSettings />} />
@@ -129,11 +135,11 @@ export default function MainLayout() {
       </Routes>
 
 
-      <div className="mobile-tabbar">
-        <NavButton icon={<MessageSquare size={22} />} label="消息" path="/messages" active={isActive("/messages")} badge={totalUnread} />
+      {isRoot && <nav aria-label="手机主导航" className="mobile-tabbar">
         <NavButton icon={<Users size={22} />} label="通讯录" path="/contact" active={isActive("/contact")} badge={pendingRequests} />
-        <NavButton icon={<SettingsIcon size={22} />} label="设置" path="/settings" active={isActive("/settings")} />
-      </div>
+        <NavButton icon={<MessageSquare size={22} />} label="聊天" path="/messages" active={isActive("/messages")} badge={totalUnread} />
+        <NavButton icon={<SettingsIcon size={22} />} label="我的" path="/settings" active={isActive("/settings")} />
+      </nav>}
     </div>
   );
 }

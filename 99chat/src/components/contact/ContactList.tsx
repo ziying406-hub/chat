@@ -18,7 +18,7 @@ export default function ContactList() {
   const [onlineOnly, setOnlineOnly] = useState(false);
 
   const pendingRequests = friendRequests.filter((r: any) => (r as any).handleResult === 0).length;
-  const isActive = (path: string) => location.pathname === path;
+  const isActive = (path: string) => location.pathname.replace(/\/+$/, "") === path;
 
   const filteredFriends = friends.filter(
     (f) => (f.nickname || "").includes(search) || (f.remark || "").includes(search)
@@ -45,7 +45,7 @@ export default function ContactList() {
 
   return (
     <>
-      <div className="w-[320px] border-r border-gray-100 flex flex-col bg-white">
+      <div className={`list-panel w-[320px] border-r border-gray-100 flex flex-col bg-white ${isActive("/contact") ? "mobile-panel-active" : ""}`}>
         <div className="px-4 pt-4 pb-2">
           <h2 className="text-lg font-semibold text-gray-800 mb-3">通讯录</h2>
           <div className="relative">
@@ -164,7 +164,7 @@ export default function ContactList() {
           )}
         </div>
       </div>
-      <Outlet />
+      <div className={`detail-panel ${!isActive("/contact") ? "mobile-panel-active" : ""}`}><Outlet /></div>
     </>
   );
 }

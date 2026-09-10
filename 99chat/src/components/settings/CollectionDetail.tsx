@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import UnavailableDetail from "../layout/UnavailableDetail";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { useAppStore } from "../../store/app-store";
@@ -35,7 +36,7 @@ export default function CollectionDetail() {
     load();
   }, [chatToken, id, userID]);
 
-  if (!item) return <div className="flex-1 flex items-center justify-center text-sm text-gray-300">收藏不存在</div>;
+  if (!item) return <UnavailableDetail to="/settings/collections" label="返回我的收藏">收藏不存在</UnavailableDetail>;
 
   return (
     <div className="flex-1 flex flex-col bg-gray-50 min-w-0">

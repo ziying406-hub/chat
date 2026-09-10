@@ -1,4 +1,5 @@
 import { useState } from "react";
+import MobileBackButton from "../layout/MobileBackButton";
 import { Phone } from "lucide-react";
 import { useAppStore } from "../../store/app-store";
 import { changePassword } from "../../services/openim";
@@ -59,7 +60,8 @@ export default function SecuritySettings() {
 
   return (
     <div className="flex-1 flex flex-col bg-gray-50">
-      <div className="bg-white px-6 py-4 border-b border-gray-100">
+      <div className="mobile-page-heading bg-white px-6 py-4 border-b border-gray-100">
+        <MobileBackButton to="/settings" />
         <h2 className="text-lg font-bold text-gray-800">安全</h2>
       </div>
 

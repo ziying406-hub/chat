@@ -12,6 +12,14 @@
 
 ## 1. 系统架构总览
 
+### 手机布局实现边界（2026-09-10）
+
+`MainLayout` 的 `.app-shell` 管理动态视口、安全区和根导航；`ConversationList`、`ContactList`、`Settings` 以当前路由决定手机端显示 `.list-panel` 或 `.detail-panel`，不重新初始化 OpenIM。桌面详情包装层为 `display: contents`，保持原有多栏布局。
+
+`useIsMobile` 订阅 `(max-width: 768px)`，仅控制设置根路由的默认行为。已有返回按钮保留，缺少返回的设置标题使用 `MobileBackButton`；缺失资源使用 `UnavailableDetail` 保持可返回。聊天的 `.chat-view`、`.chat-composer`、`.message-content` 和 `.emoji-picker` 定义局部尺寸约束，不改消息发送、上传、鉴权和权限判断。
+
+验证命令和限制见 [手机布局验证记录](mobile-layout-verification-2026-09-10.md)。此功能只改前端，不需重启 OpenIM。
+
 ### 1.1 架构全景图
 
 ```mermaid

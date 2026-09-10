@@ -1,4 +1,5 @@
 import { useState } from "react";
+import MobileBackButton from "../layout/MobileBackButton";
 import { useNavigate } from "react-router-dom";
 import { ChevronRight, Users, Smile, Trash2 } from "lucide-react";
 import { useAppStore } from "../../store/app-store";
@@ -34,7 +35,8 @@ export default function MessagingSettings() {
 
   return (
     <div className="flex-1 flex flex-col bg-gray-50">
-      <div className="bg-white px-6 py-4 border-b border-gray-100">
+      <div className="mobile-page-heading bg-white px-6 py-4 border-b border-gray-100">
+        <MobileBackButton to="/settings" />
         <h2 className="text-lg font-bold text-gray-800">聊天设置</h2>
       </div>
 

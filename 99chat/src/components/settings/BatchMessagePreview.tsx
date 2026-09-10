@@ -1,4 +1,5 @@
 import { useState } from "react";
+import UnavailableDetail from "../layout/UnavailableDetail";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Trash2 } from "lucide-react";
 import { deleteBatchMessageTask, getBatchMessageTask } from "../../services/batch-message";
@@ -11,7 +12,7 @@ export default function BatchMessagePreview() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const task = id ? getBatchMessageTask(userID, id) : null;
 
-  if (!task) return <div className="flex-1 flex items-center justify-center text-sm text-gray-300">群发记录不存在</div>;
+  if (!task) return <UnavailableDetail to="/settings/messaging/batch" label="返回群发助手">群发记录不存在</UnavailableDetail>;
 
   const deleteTask = () => {
     deleteBatchMessageTask(userID, task.id);

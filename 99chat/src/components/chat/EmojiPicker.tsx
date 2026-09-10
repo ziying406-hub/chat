@@ -35,7 +35,7 @@ export default function EmojiPicker({ onPick, onClose }: EmojiPickerProps) {
   const category = categories[activeCategory];
 
   return (
-    <div className="absolute bottom-14 left-0 right-0 z-50 bg-white rounded-t-xl shadow-xl border border-gray-100 max-h-64 flex flex-col">
+    <div className="emoji-picker absolute bottom-14 left-0 right-0 z-50 bg-white rounded-t-xl shadow-xl border border-gray-100 max-h-64 flex flex-col">
       <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100">
         <div className="flex gap-1">
           {categories.map((c, i) => (

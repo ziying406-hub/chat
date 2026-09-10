@@ -1,4 +1,5 @@
 import { Fragment, useState, useRef, useEffect } from "react";
+import UnavailableDetail from "../layout/UnavailableDetail";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Video, MoreVertical, Smile, Paperclip, Send, Image as ImageIcon, Mic,
@@ -128,7 +129,7 @@ export default function ChatView() {
     setDismissedAnnouncement(localStorage.getItem(announcementStorageKey) || "");
   }, [announcementStorageKey]);
 
-  if (!conv) return <div className="flex-1 flex items-center justify-center text-gray-300">会话不存在</div>;
+  if (!conv) return <UnavailableDetail to="/messages" label="返回聊天列表">会话不存在</UnavailableDetail>;
 
   const isGroup = conv.conversationType === SessionType.Group;
   const peerUser = !isGroup ? friends.find((f) => f.userID === conv.userID) : null;
@@ -391,15 +392,15 @@ export default function ChatView() {
     .filter((img: any) => img.url);
 
   return (
-    <div className="flex-1 min-w-0 flex flex-col h-full">
+    <div className="chat-view relative flex-1 min-w-0 flex flex-col h-full">
       {/* Header */}
-      <div className="h-16 border-b border-gray-100 flex items-center justify-between px-5 bg-white">
-        <div className="flex items-center gap-3">
-          <button onClick={() => navigate("/messages")} className="text-gray-400 hover:text-gray-600 md:hidden"><ArrowLeft size={20} /></button>
-          <h3 className="text-base font-semibold text-gray-800">{conv.showName || "未知"}</h3>
+      <div className="chat-header h-16 border-b border-gray-100 flex items-center justify-between px-5 bg-white">
+        <div className="flex min-w-0 items-center gap-3">
+          <button aria-label="返回聊天列表" onClick={() => navigate("/messages")} className="mobile-back text-gray-400 hover:text-gray-600"><ArrowLeft size={20} /></button>
+          <h3 className="min-w-0 truncate text-base font-semibold text-gray-800">{conv.showName || "未知"}</h3>
           {isGroup && groupMembers[conv.groupID] && <span className="text-xs text-gray-400">({groupMembers[conv.groupID].length})</span>}
         </div>
-        <div className="flex items-center gap-2 relative">
+        <div className="flex shrink-0 items-center gap-2 relative">
           <button aria-label="更多聊天操作" onClick={() => setShowMenu(!showMenu)} className="w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-500"><MoreVertical size={18} /></button>
           <button aria-label="聊天设置" onClick={() => navigate(`/messages/session/${id}/settings`)} className="w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-500"><Settings size={18} /></button>
           {showMenu && (
@@ -543,7 +544,7 @@ export default function ChatView() {
                 <div className="w-9 h-9 flex-shrink-0">
                   {showAvatar && <img src={getSenderAvatar(msg) || `https://api.dicebear.com/7.x/avataaars/svg?seed=${msg.sendID}`} alt="" className="w-9 h-9 rounded-lg object-cover bg-gray-100" />}
                 </div>
-                <div className={`flex flex-col max-w-[60%] ${self ? "items-end" : "items-start"}`}>
+                <div className={`message-content flex flex-col max-w-[60%] ${self ? "items-end" : "items-start"}`}>
                   {showAvatar && isGroup && <span className="text-xs text-gray-400 mb-1 px-1">{getSenderName(msg)}</span>}
                   <div className="relative group">
                     {/* Text */}
@@ -743,7 +744,7 @@ export default function ChatView() {
       )}
 
       {/* Input bar */}
-      <div className="border-t border-gray-100 bg-white px-4 py-3 relative">
+      <div className="chat-composer border-t border-gray-100 bg-white px-4 py-3 relative">
         {recording ? (
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 flex-1">
@@ -773,10 +774,10 @@ export default function ChatView() {
                 <button onClick={() => setShowContactPicker(true)} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><Contact size={14} /> 发送名片</button>
               </div>
             )}
-            <button onClick={handleImageSelect} className="text-gray-400 hover:text-primary-500"><ImageIcon size={22} /></button>
+            <button aria-label="发送图片" onClick={handleImageSelect} className="composer-image-shortcut text-gray-400 hover:text-primary-500"><ImageIcon size={22} /></button>
             <input value={input} onChange={handleInputChange} onKeyDown={(e) => e.key === "Enter" && handleSend()} placeholder="输入消息..." className="flex-1 px-3 py-2 bg-gray-50 rounded-lg text-sm outline-none focus:bg-white focus:ring-1 focus:ring-primary-200 transition-all" />
-            <button onClick={startRecording} className="text-gray-400 hover:text-primary-500"><Mic size={22} /></button>
-            <button onClick={handleSend} disabled={!input.trim()} className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors ${input.trim() ? "bg-primary-500 text-white hover:bg-primary-600" : "bg-gray-100 text-gray-300"}`}><Send size={18} /></button>
+            <button aria-label="录制语音" onClick={startRecording} className="text-gray-400 hover:text-primary-500"><Mic size={22} /></button>
+            <button aria-label="发送消息" onClick={handleSend} disabled={!input.trim()} className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors ${input.trim() ? "bg-primary-500 text-white hover:bg-primary-600" : "bg-gray-100 text-gray-300"}`}><Send size={18} /></button>
           </div>
         )}
       </div>

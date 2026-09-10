@@ -1,4 +1,5 @@
 import { useState } from "react";
+import MobileBackButton from "../layout/MobileBackButton";
 import { useNavigate, useLocation } from "react-router-dom";
 import { ChevronRight, Globe, Monitor, MessageSquare, Info, Trash2, RefreshCw, Bug } from "lucide-react";
 import { useAppStore } from "../../store/app-store";
@@ -78,7 +79,8 @@ export default function GeneralSettings() {
 
   return (
     <div className="flex-1 flex flex-col bg-gray-50">
-      <div className="bg-white px-6 py-4 border-b border-gray-100">
+      <div className="mobile-page-heading bg-white px-6 py-4 border-b border-gray-100">
+        <MobileBackButton to="/settings" />
         <h2 className="text-lg font-bold text-gray-800">通用</h2>
       </div>
 

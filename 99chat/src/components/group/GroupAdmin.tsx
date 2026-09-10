@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import UnavailableDetail from "../layout/UnavailableDetail";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft, Crown, Shield, UserPlus, UserMinus, VolumeX, LogOut, Check, X, Bell,
@@ -68,7 +69,7 @@ export default function GroupAdmin() {
     }
   }, [group]);
 
-  if (!group) return <div className="flex-1 flex items-center justify-center text-gray-300">群组不存在</div>;
+  if (!group) return <UnavailableDetail to="/contact/groups" label="返回群组列表">群组不存在</UnavailableDetail>;
 
   const sorted = [...members].sort((a, b) => (b.roleLevel || 0) - (a.roleLevel || 0));
   const admins = sorted.filter((m) => m.roleLevel >= GroupMemberRole.Admin);

@@ -22,6 +22,14 @@ docker compose up -d
 npm run build
 ```
 
+## 手机网页布局
+
+宽度不超过 768px 时使用单屏列表/详情导航，底部“通讯录／聊天／我的”仅在根页面显示；详情沿用现有返回入口。超过 768px 保留桌面多栏，手机端 `/settings` 显示个人中心菜单，桌面默认进入个人资料。
+
+聊天区使用动态视口高度和安全区补白，并约束输入工具栏、消息和弹窗尺寸。没有新增移动端服务器或 SDK 登录实例。真实手机软键盘仍需 iPhone/Android 实机验收，不能用缩小桌面窗口代替。
+
+本地 OpenIM 测试账号就绪后执行 `node mobile_layout_e2e.cjs` 和 `node mobile_chat_e2e.cjs`。后者会在本地测试账号之间发送验证消息、图片并保存一条收藏；不要对客户账号运行。完整结果见 [手机布局验证](../docs/mobile-layout-verification-2026-09-10.md)。
+
 ## 离线消息通知
 
 前端使用 Firebase Web SDK，后端使用 OpenIM 原生 FCM 提供者。用户在「通知设置 → 新消息通知」授权并完成 Token 绑定后启用，关闭通知或主动退出时撤销浏览器订阅。Chrome 无痕模式不支持 Web Push；普通浏览器也需允许系统通知并可访问 Google 推送服务。

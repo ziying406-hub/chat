@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import UnavailableDetail from "../layout/UnavailableDetail";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, BellOff, ChevronRight, EyeOff, Image as ImageIcon, Pin, Search, ShieldAlert, Trash2, Users } from "lucide-react";
 import { SessionType } from "@openim/wasm-client-sdk";
@@ -37,7 +38,7 @@ export default function ConversationSettings() {
   }, [conv?.groupID, loadMembers]);
 
   if (!id || !conv) {
-    return <div className="flex-1 flex items-center justify-center text-sm text-gray-300">会话不存在</div>;
+    return <UnavailableDetail to="/messages" label="返回聊天列表">会话不存在</UnavailableDetail>;
   }
 
   const isGroup = conv.conversationType === SessionType.Group;
