@@ -19,6 +19,7 @@ import {
 } from "../services/openim";
 import { GroupMemberFilter, GroupStatus, SessionType, MessageType } from "@openim/wasm-client-sdk";
 import { getUserStorageKey } from "../utils/storage";
+import { groupPermissions } from "../utils/group-permissions";
 
 let sdkListenersBound = false;
 
@@ -86,6 +87,7 @@ function saveAccountToLocal(authData: AuthData, nickname: string, faceURL: strin
 }
 
 interface AppState {
+  quitGroup: (groupID: string) => Promise<void>;
   isAuthed: boolean;
   isLoggingIn: boolean;
   isSessionRestoring: boolean;
@@ -194,6 +196,24 @@ interface AppState {
 
 export const useAppStore = create<AppState>()(
   immer((set, get) => {
+    const requireGroupPermission = (groupID: string, action: "manage" | "owner" | "invite" | "member", targetID?: string) => {
+      const state = get();
+      const group = state.groups.find((item) => item.groupID === groupID);
+      const members = state.groupMembersMap[groupID] || [];
+      const permissions = groupPermissions(group?.ownerUserID, state.currentUser?.userID, members);
+      const target = members.find((member) => member.userID === targetID);
+      const allowed = action === "manage" ? permissions.canManage : action === "owner" ? permissions.isOwner :
+        action === "invite" ? permissions.canInvite : Boolean(target && permissions.canManageMember(target));
+      if (!allowed) throw new Error("当前群权限不足，请刷新群资料后重试");
+      return permissions;
+    };
+    const removeJoinedGroup = (group: { groupID: string }) => {
+      set((state) => {
+        state.groups = state.groups.filter((item) => item.groupID !== group.groupID);
+        delete state.groupMembersMap[group.groupID];
+        state.groupRequests = state.groupRequests.filter((item) => item.groupID !== group.groupID);
+      });
+    };
     const bindSDKListeners = (im: ReturnType<typeof getIMSDK>) => {
       if (sdkListenersBound) return;
       sdkListenersBound = true;
@@ -274,13 +294,15 @@ export const useAppStore = create<AppState>()(
         refreshGroupApplications();
       });
       on(CbEvents.OnJoinedGroupAdded, refreshJoinedGroups);
-      on(CbEvents.OnJoinedGroupDeleted, refreshJoinedGroups);
-      on(CbEvents.OnGroupDismissed, refreshJoinedGroups);
+      on(CbEvents.OnJoinedGroupDeleted, removeJoinedGroup);
+      on(CbEvents.OnGroupDismissed, removeJoinedGroup);
       on(CbEvents.OnGroupInfoChanged, refreshJoinedGroups);
       const refreshGroupMembers = (member: GroupMemberItem) => {
         if (!member?.groupID) return;
         im.getGroupMemberList({ groupID: member.groupID, filter: GroupMemberFilter.All, offset: 0, count: 1000 }).then((res) => {
-          set((state) => { state.groupMembersMap[member.groupID] = res.data || []; });
+          set((state) => {
+            if (state.groups.some((group) => group.groupID === member.groupID)) state.groupMembersMap[member.groupID] = res.data || [];
+          });
         });
       };
       on(CbEvents.OnGroupMemberAdded, refreshGroupMembers);
@@ -1097,6 +1119,7 @@ export const useAppStore = create<AppState>()(
     },
 
     setGroupInfo: async (groupID, info) => {
+      requireGroupPermission(groupID, "manage");
       const im = getIMSDK();
       try {
         await im.setGroupInfo({ groupID, ...info } as any);
@@ -1113,16 +1136,19 @@ export const useAppStore = create<AppState>()(
     },
 
     inviteToGroup: async (groupID, userIDs, reason) => {
+      requireGroupPermission(groupID, "invite");
       const result = await getIMSDK().inviteUserToGroup({ groupID, userIDList: userIDs, reason } as any);
       if (result.errCode !== 0) throw new Error(result.errMsg || "邀请失败");
     },
 
     kickFromGroup: async (groupID, userIDs, reason) => {
+      for (const userID of userIDs) requireGroupPermission(groupID, "member", userID);
       const result = await getIMSDK().kickGroupMember({ groupID, userIDList: userIDs, reason } as any);
       if (result.errCode !== 0) throw new Error(result.errMsg || "移除成员失败");
     },
 
     muteGroupMember: async (groupID, userID, seconds) => {
+      requireGroupPermission(groupID, "member", userID);
       const im = getIMSDK();
       try {
         await im.changeGroupMemberMute({ groupID, userID, mutedSeconds: seconds });
@@ -1137,6 +1163,7 @@ export const useAppStore = create<AppState>()(
     },
 
     muteGroup: async (groupID, isMute) => {
+      requireGroupPermission(groupID, "manage");
       const im = getIMSDK();
       try {
         await im.changeGroupMute({ groupID, isMute });
@@ -1151,12 +1178,23 @@ export const useAppStore = create<AppState>()(
     },
 
     dismissGroup: async (groupID) => {
+      requireGroupPermission(groupID, "owner");
       const result = await getIMSDK().dismissGroup(groupID);
       if (result.errCode !== 0) throw new Error(result.errMsg || "解散群组失败");
-      set((s) => { s.groups = s.groups.filter((g) => g.groupID !== groupID); });
+      removeJoinedGroup({ groupID });
+    },
+
+    quitGroup: async (groupID) => {
+      const permissions = requireGroupPermission(groupID, "invite");
+      if (permissions.isOwner) throw new Error("群主需先转让群主后再退出");
+      const result = await getIMSDK().quitGroup(groupID);
+      if (result.errCode !== 0) throw new Error(result.errMsg || "退出群组失败");
+      removeJoinedGroup({ groupID });
     },
 
     transferGroupOwner: async (groupID, newOwnerUserID) => {
+      requireGroupPermission(groupID, "owner");
+      requireGroupPermission(groupID, "member", newOwnerUserID);
       const im = getIMSDK();
       try {
         await im.transferGroupOwner({ groupID, newOwnerUserID });
@@ -1177,6 +1215,7 @@ export const useAppStore = create<AppState>()(
     },
 
     acceptGroupApplication: async (groupID, fromUserID) => {
+      requireGroupPermission(groupID, "manage");
       const im = getIMSDK();
       try {
         const result = await im.acceptGroupApplication({ groupID, fromUserID, handleMsg: "同意" } as any);
@@ -1186,6 +1225,7 @@ export const useAppStore = create<AppState>()(
     },
 
     refuseGroupApplication: async (groupID, fromUserID) => {
+      requireGroupPermission(groupID, "manage");
       const im = getIMSDK();
       try {
         const result = await im.refuseGroupApplication({ groupID, fromUserID, handleMsg: "拒绝" } as any);
@@ -1195,6 +1235,8 @@ export const useAppStore = create<AppState>()(
     },
 
     setGroupMemberNickname: async (groupID, userID, nickname) => {
+      requireGroupPermission(groupID, "invite");
+      if (userID !== get().currentUser?.userID) throw new Error("只能修改自己的群昵称");
       const im = getIMSDK();
       try {
         await im.setGroupMemberInfo({ groupID, userID, nickname } as any);
@@ -1203,6 +1245,9 @@ export const useAppStore = create<AppState>()(
     },
 
     setGroupMemberRole: async (groupID, userID, roleLevel) => {
+      requireGroupPermission(groupID, "owner");
+      requireGroupPermission(groupID, "member", userID);
+      if (roleLevel !== 20 && roleLevel !== 60) throw new Error("请通过转让群主操作修改群主身份");
       const im = getIMSDK();
       try {
         await im.setGroupMemberInfo({ groupID, userID, roleLevel } as any);

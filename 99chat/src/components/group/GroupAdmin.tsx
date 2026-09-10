@@ -21,6 +21,7 @@ export default function GroupAdmin() {
   const groupRequests = useAppStore((s) => s.groupRequests);
   const loadGroupApps = useAppStore((s) => s.loadGroupApplications);
   const dismissGroup = useAppStore((s) => s.dismissGroup);
+  const quitGroup = useAppStore((s) => s.quitGroup);
   const setGroupInfo = useAppStore((s) => s.setGroupInfo);
   const uploadAvatar = useAppStore((s) => s.uploadAvatar);
   const muteMember = useAppStore((s) => s.muteGroupMember);
@@ -319,9 +320,9 @@ export default function GroupAdmin() {
             </div>}
             <div className="px-5 py-3 border-t border-gray-50">
               {isOwner ? (
-                <button onClick={() => { if (confirm("确定解散群组？")) { dismissGroup(id!); navigate("/contact/groups"); } }} className="w-full text-left text-sm text-red-400 hover:text-red-500 flex items-center gap-2 py-2"><LogOut size={16} /> 解散群组</button>
+                <button onClick={async () => { if (confirm("确定解散群组？")) { try { await dismissGroup(id!); navigate("/contact/groups"); } catch { setActionError("解散失败，请检查当前群权限"); } } }} className="w-full text-left text-sm text-red-400 hover:text-red-500 flex items-center gap-2 py-2"><LogOut size={16} /> 解散群组</button>
               ) : (
-                <button onClick={async () => { if (confirm("确定退出群组？")) { await getIMSDK().quitGroup(id!); navigate("/contact/groups"); } }} className="w-full text-left text-sm text-red-400 hover:text-red-500 flex items-center gap-2 py-2"><LogOut size={16} /> 退出群组</button>
+                <button onClick={async () => { if (confirm("确定退出群组？")) { try { await quitGroup(id!); navigate("/contact/groups"); } catch { setActionError("退出失败，请刷新群资料后重试"); } } }} className="w-full text-left text-sm text-red-400 hover:text-red-500 flex items-center gap-2 py-2"><LogOut size={16} /> 退出群组</button>
               )}
             </div>
           </div>
@@ -329,7 +330,7 @@ export default function GroupAdmin() {
       </div>
 
       {/* Invite modal */}
-      {showInvite && (
+      {showInvite && canInvite && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setShowInvite(false)}>
           <div className="bg-white rounded-2xl p-6 w-80" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-base font-semibold text-gray-800 mb-3">邀请好友</h3>

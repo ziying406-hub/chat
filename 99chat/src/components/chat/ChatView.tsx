@@ -15,6 +15,7 @@ import { saveFavorite } from "../../services/openim";
 import { SessionType, MessageType } from "@openim/wasm-client-sdk";
 import MediaViewer from "../chat/media/MediaViewer";
 import EmojiPicker from "./EmojiPicker";
+import { groupPermissions } from "../../utils/group-permissions";
 
 export default function ChatView() {
   const { id } = useParams();
@@ -112,6 +113,7 @@ export default function ChatView() {
   }, [conv?.conversationType, conv?.groupID]);
 
   const group = groups.find((item) => item.groupID === conv?.groupID);
+  const { canInvite } = groupPermissions(group?.ownerUserID, currentUser?.userID, groupMembers[group?.groupID || ""] || []);
   const groupAnnouncement = group?.notification?.trim() || "";
   const announcementStorageKey = currentUser && conv?.groupID
     ? getUserStorageKey(`99chat_hidden_group_announcement_${conv.groupID}`, currentUser.userID)
@@ -395,7 +397,7 @@ export default function ChatView() {
                   <button onClick={() => navigate(`/contact/group/${conv.groupID}`)} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-600">群聊信息</button>
                   <button onClick={() => navigate(`/messages/groups/admin/${conv.groupID}`)} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-600">群管理</button>
                   <button onClick={() => setShowAnnouncement(true)} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-600">群公告</button>
-                  <button onClick={() => setShowInvite(true)} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><UserPlus size={14} /> 邀请好友</button>
+                  {canInvite && <button onClick={() => setShowInvite(true)} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><UserPlus size={14} /> 邀请好友</button>}
                   <button onClick={() => muteConversation(id!, conv.recvMsgOpt === 0 ? 2 : 0)} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><BellOff size={14} /> {conv.recvMsgOpt === 0 ? "消息免打扰" : "解除免打扰"}</button>
                 </>
               )}
@@ -825,7 +827,7 @@ export default function ChatView() {
       )}
 
       {/* Invite friends modal */}
-      {showInvite && isGroup && (
+      {showInvite && isGroup && canInvite && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setShowInvite(false)}>
           <div className="bg-white rounded-2xl shadow-xl w-80 max-w-[90%] max-h-[60vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">

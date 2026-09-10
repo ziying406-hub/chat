@@ -15,7 +15,15 @@ async function login(page, phone) {
   const browser = await chromium.launch({ headless: true });
   try {
     const owner = await (await browser.newContext()).newPage();
+    let ownerStoreURL;
+    owner.on('request', request => {
+      if (new URL(request.url()).pathname === '/src/store/app-store.ts') ownerStoreURL = request.url();
+    });
     const member = await (await browser.newContext()).newPage();
+    let memberStoreURL;
+    member.on('request', request => {
+      if (new URL(request.url()).pathname === '/src/store/app-store.ts') memberStoreURL = request.url();
+    });
     await login(owner, '13800138000');
     const name = `权限验证-${Date.now()}`;
     await owner.goto(`${BASE}/#/contact/create-group`);
@@ -40,6 +48,12 @@ async function login(page, phone) {
     assert.equal(await member.locator('input[readonly]').count(), 0);
     assert.equal(await member.locator('textarea').count(), 0);
     await member.locator('p').filter({ hasText: name }).waitFor();
+    const actionRejected = await member.evaluate(async ({ groupID, storeURL }) => {
+      const { useAppStore } = await import(storeURL);
+      try { await useAppStore.getState().setGroupInfo(groupID, { introduction: 'must not reach SDK' }); return false; }
+      catch (error) { return error.message === '当前群权限不足，请刷新群资料后重试'; }
+    }, { groupID, storeURL: memberStoreURL });
+    assert.equal(actionRejected, true, 'Shared action must reject ordinary member before SDK mutation');
     const rejected = await member.evaluate(async (groupID) => {
       const { getIMSDK } = await import('/src/services/openim.ts');
       try {
@@ -66,6 +80,24 @@ async function login(page, phone) {
     assert.equal(await member.getByRole('button', { name: '保存', exact: true }).count(), 0);
     assert.equal(await member.locator('textarea').count(), 0);
     await member.getByText('管理员更新简介', { exact: true }).waitFor();
-    console.log('PASS: ordinary member readonly and API rejection; administrator edit persisted; demotion removes permissions; owner can transfer to administrator');
+    await owner.getByRole('button', { name: /^设为管理员 / }).click();
+    await owner.getByRole('button', { name: /^取消管理员 / }).waitFor();
+    owner.once('dialog', dialog => dialog.accept());
+    await owner.getByRole('button', { name: /^转让群主 / }).click();
+    await member.getByRole('button', { name: '解散群组', exact: true }).waitFor();
+    await owner.getByRole('button', { name: '设置', exact: true }).last().click();
+    assert.equal(await owner.getByRole('button', { name: '解散群组', exact: true }).count(), 0);
+    owner.once('dialog', dialog => dialog.accept());
+    await owner.getByRole('button', { name: '退出群组', exact: true }).click();
+    await owner.waitForURL(/#\/contact\/groups/);
+    await owner.goto(url);
+    await owner.getByText('群组不存在', { exact: true }).waitFor();
+    const leftDenied = await owner.evaluate(async ({ groupID, storeURL }) => {
+      const { useAppStore } = await import(storeURL);
+      try { await useAppStore.getState().inviteToGroup(groupID, ['3540424232'], 'must not run'); return false; }
+      catch (error) { return error.message === '当前群权限不足，请刷新群资料后重试'; }
+    }, { groupID, storeURL: ownerStoreURL });
+    assert.equal(leftDenied, true, 'Exited member cannot call shared invite action');
+    console.log('PASS: readonly and shared action/API rejection; admin edit and demotion; ownership transfer; quit removes old route and invite permissions');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exit(1); });

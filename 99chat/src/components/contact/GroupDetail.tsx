@@ -2,7 +2,6 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
 import { ArrowLeft, Users, Volume2, LogOut, Crown, Shield, QrCode, Settings as SettingsIcon, Edit3, Trash2, X, Camera, ChevronDown } from "lucide-react";
 import { useAppStore } from "../../store/app-store";
-import { getIMSDK } from "../../services/openim";
 import { GroupMemberRole } from "@openim/wasm-client-sdk";
 import { groupPermissions } from "../../utils/group-permissions";
 
@@ -18,6 +17,7 @@ export default function GroupDetail() {
   const setGroupInfo = useAppStore((s) => s.setGroupInfo);
   const uploadAvatar = useAppStore((s) => s.uploadAvatar);
   const dismissGroup = useAppStore((s) => s.dismissGroup);
+  const quitGroup = useAppStore((s) => s.quitGroup);
   const conversations = useAppStore((s) => s.conversations);
   const muteConversation = useAppStore((s) => s.muteConversation);
 
@@ -96,8 +96,7 @@ export default function GroupDetail() {
       if (group.ownerUserID === currentUser?.userID) {
         await dismissGroup(group.groupID);
       } else {
-        const result = await getIMSDK().quitGroup(group.groupID);
-        if (result.errCode !== 0) throw new Error(result.errMsg || "退出群组失败");
+        await quitGroup(group.groupID);
       }
       setShowConfirmQuit(false);
       navigate("/contact/groups");

@@ -19,6 +19,7 @@ export default function ConversationSettings() {
   const deleteConversation = useAppStore((s) => s.deleteConversation);
   const hideConversation = useAppStore((s) => s.hideConversation);
   const dismissGroup = useAppStore((s) => s.dismissGroup);
+  const quitGroup = useAppStore((s) => s.quitGroup);
   const refreshConversations = useAppStore((s) => s.refreshConversations);
   const [burnEnabled, setBurnEnabled] = useState(Boolean((conv as any)?.isMsgDestruct));
   const [busy, setBusy] = useState<"burn" | "mute" | "pin" | "clear" | "leave" | null>(null);
@@ -104,7 +105,7 @@ export default function ConversationSettings() {
     setError("");
     try {
       if (isOwner) await dismissGroup(group.groupID);
-      else await getIMSDK().quitGroup(group.groupID);
+      else await quitGroup(group.groupID);
       navigate("/messages", { replace: true });
     } catch (cause: any) {
       setError(cause?.message || "操作失败，请重试");

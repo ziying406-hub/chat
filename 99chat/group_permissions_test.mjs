@@ -19,4 +19,7 @@ assert.equal(groupPermissions(undefined, undefined, []).canManage, false);
 assert.equal(groupPermissions('owner', 'unknown', []).canInvite, false);
 assert.equal(groupPermissions('owner', 'owner', []).canManage, true);
 assert.equal(groupPermissions('owner', 'admin', [{ userID: 'admin', roleLevel: 20 }]).canManage, false);
+assert.equal(groupPermissions(undefined, 'admin', members).canManage, false, 'Left group must not retain cached administrator permissions');
+assert.equal(groupPermissions(undefined, 'member', members).canInvite, false, 'Left group must not retain invite permissions');
+assert.equal(groupPermissions('owner', 'owner', [{ userID: 'owner', roleLevel: 20 }]).isOwner, false, 'New member role must revoke stale ownership');
 console.log('PASS: owner, admin, ordinary member, loading and demotion permissions');
