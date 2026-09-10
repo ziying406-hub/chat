@@ -2,14 +2,13 @@ import { useEffect, useState } from "react";
 import { Bell, Volume2, Vibrate } from "lucide-react";
 import { useAppStore } from "../../store/app-store";
 import { getUserStorageKey } from "../../utils/storage";
+import { registerWebPush, unregisterWebPush } from "../../services/push";
 
 export default function NotificationSettings() {
   const userID = useAppStore((state) => state.currentUser?.userID);
   const [muteAll, setMuteAll] = useState(false);
-  const [notifEnabled, setNotifEnabled] = useState(() => {
-    if (!("Notification" in window)) return false;
-    return Notification.permission === "granted";
-  });
+  const [notifEnabled, setNotifEnabled] = useState(false);
+  const [pushStatus, setPushStatus] = useState("");
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [vibrateEnabled, setVibrateEnabled] = useState(true);
   const [requestingPermission, setRequestingPermission] = useState(false);
@@ -17,13 +16,17 @@ export default function NotificationSettings() {
 
   useEffect(() => {
     if (!userID) return;
+    setNotifEnabled(localStorage.getItem(getUserStorageKey("99chat_notif_enabled", userID)) === "true" && "Notification" in window && Notification.permission === "granted");
     setMuteAll(localStorage.getItem(getUserStorageKey("99chat_mute_all", userID)) === "true");
     setSoundEnabled(localStorage.getItem(getUserStorageKey("99chat_sound_enabled", userID)) !== "false");
     setVibrateEnabled(localStorage.getItem(getUserStorageKey("99chat_vibrate_enabled", userID)) !== "false");
   }, [userID]);
 
-  const toggleMuteAll = () => {
+  const toggleMuteAll = async () => {
     const next = !muteAll;
+    if (next && notifEnabled) {
+      try { await unregisterWebPush(); } catch { setPushStatus("关闭推送失败，请重试"); return; }
+    }
     setMuteAll(next);
     const muteKey = storageKey("99chat_mute_all");
     if (muteKey) localStorage.setItem(muteKey, String(next));
@@ -42,30 +45,24 @@ export default function NotificationSettings() {
   };
 
   const toggleNotif = async () => {
-    if (!notifEnabled) {
-      // Requesting permission
-      if ("Notification" in window) {
-        setRequestingPermission(true);
-        try {
-          const permission = await Notification.requestPermission();
-          if (permission === "granted") {
-            setNotifEnabled(true);
-            const notificationKey = storageKey("99chat_notif_enabled");
-            if (notificationKey) localStorage.setItem(notificationKey, "true");
-            // Register FCM for push notifications
-            try {
-              const { registerFCM } = await import("../../services/openim");
-              await registerFCM();
-            } catch {}
-          }
-        } catch {}
-        setRequestingPermission(false);
+    setRequestingPermission(true);
+    setPushStatus("");
+    try {
+      if (!notifEnabled) {
+        if (!("Notification" in window)) throw new Error("此浏览器不支持通知");
+        if (await Notification.requestPermission() !== "granted") throw new Error("请在浏览器设置中允许通知");
+        await registerWebPush();
+      } else {
+        await unregisterWebPush();
       }
-    } else {
-      setNotifEnabled(false);
+      const next = !notifEnabled;
+      setNotifEnabled(next);
       const notificationKey = storageKey("99chat_notif_enabled");
-      if (notificationKey) localStorage.setItem(notificationKey, "false");
-    }
+      if (notificationKey) localStorage.setItem(notificationKey, String(next));
+      setPushStatus(next ? "离线推送已启用" : "离线推送已关闭");
+    } catch (error) {
+      setPushStatus(error instanceof Error ? error.message : "推送设置失败，请重试");
+    } finally { setRequestingPermission(false); }
   };
 
   const toggleSound = () => {
@@ -86,8 +83,10 @@ export default function NotificationSettings() {
     }
   };
 
-  const Toggle = ({ on, onClick, disabled }: { on: boolean; onClick: () => void; disabled?: boolean }) => (
+  const Toggle = ({ on, onClick, disabled, label }: { on: boolean; onClick: () => void; disabled?: boolean; label?: string }) => (
     <button
+      aria-label={label}
+      aria-pressed={on}
       onClick={onClick}
       disabled={disabled}
       className={`w-11 h-6 rounded-full transition-colors ${on ? "bg-primary-500" : "bg-gray-200"} ${disabled ? "opacity-50" : ""}`}
@@ -116,8 +115,9 @@ export default function NotificationSettings() {
             <Bell size={18} className="text-gray-400" />
             <span className="text-sm text-gray-700">新消息通知</span>
           </div>
-          <Toggle on={notifEnabled} onClick={toggleNotif} disabled={requestingPermission || muteAll} />
+          <Toggle label="新消息通知" on={notifEnabled} onClick={toggleNotif} disabled={requestingPermission || muteAll} />
         </div>
+        {pushStatus && <p role="status" className="px-5 py-2 text-sm text-gray-500">{pushStatus}</p>}
       </div>
 
       <div className="px-5 pt-4 pb-1 text-xs font-medium text-gray-400">应用打开时</div>

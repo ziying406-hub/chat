@@ -20,6 +20,7 @@ import {
 import { GroupMemberFilter, GroupStatus, SessionType, MessageType } from "@openim/wasm-client-sdk";
 import { getUserStorageKey } from "../utils/storage";
 import { groupPermissions } from "../utils/group-permissions";
+import { unregisterWebPush } from "../services/push";
 
 let sdkListenersBound = false;
 
@@ -377,6 +378,7 @@ export const useAppStore = create<AppState>()(
 
     login: async (params) => {
       try {
+        if (get().currentUser) await unregisterWebPush();
         set((s) => { s.isLoggingIn = true; s.authError = null; });
         const data = await loginUser(params);
         saveSession(data);
@@ -395,6 +397,7 @@ export const useAppStore = create<AppState>()(
     },
 
     logout: async () => {
+      await unregisterWebPush();
       try { await sdkLogout(); } catch {}
       clearSession();
       set((s) => {

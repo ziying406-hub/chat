@@ -1,4 +1,5 @@
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
+import { useState } from "react";
 import { useAppStore } from "../../store/app-store";
 
 export default function Settings() {
@@ -6,6 +7,8 @@ export default function Settings() {
   const location = useLocation();
   const currentUser = useAppStore((s) => s.currentUser);
   const logout = useAppStore((s) => s.logout);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState("");
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -67,11 +70,19 @@ export default function Settings() {
           </button>
 
           <button
-            onClick={() => { logout(); navigate("/auth/sign-in"); }}
+            disabled={loggingOut}
+            onClick={async () => {
+              setLoggingOut(true);
+              setLogoutError("");
+              try { await logout(); navigate("/auth/sign-in"); }
+              catch { setLogoutError("退出失败，未能撤销推送订阅，请重试"); }
+              finally { setLoggingOut(false); }
+            }}
             className="w-full flex items-center gap-3 px-5 py-3.5 rounded-lg transition-colors hover:bg-red-50 text-red-500"
           >
-            <span className="text-sm">退出</span>
+            <span className="text-sm">{loggingOut ? "正在退出…" : "退出"}</span>
           </button>
+          {logoutError && <p role="alert" className="px-5 py-2 text-sm text-red-500">{logoutError}</p>}
         </div>
       </div>
       <Outlet />

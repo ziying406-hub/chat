@@ -4,13 +4,16 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "predev": "node prepare-firebase.cjs",
     "dev": "vite",
+    "prebuild": "node prepare-firebase.cjs",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview"
   },
   "dependencies": {
     "@openim/wasm-client-sdk": "^3.8.3-patch.15.1",
+    "firebase": "12.18.0",
     "immer": "^11.1.18",
     "lucide-react": "^1.37.0",
     "react": "^19.2.8",

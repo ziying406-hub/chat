@@ -135,25 +135,6 @@ export type {
   SelfUserInfo,
 };
 
-// ---------- FCM Push ----------
-
-export async function registerFCM(): Promise<void> {
-  try {
-    const mod = "firebase" + "/messaging";
-    const firebase: any = await import(/* @vite-ignore */ mod);
-    const messaging = firebase.getMessaging();
-    const token = await firebase.getToken(messaging, {
-      vapidKey: (import.meta as any).env?.VITE_FIREBASE_VAPID_KEY,
-    });
-    if (!token) return;
-    const expireTime = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60;
-    const im = getIMSDK();
-    await im.updateFcmToken(token, expireTime);
-  } catch (e: any) {
-    console.warn("FCM registration skipped:", e?.message || e);
-  }
-}
-
 // ---------- Change Password ----------
 
 export async function changePassword(params: {

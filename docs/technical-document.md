@@ -726,7 +726,9 @@ if ('serviceWorker' in navigator) {
 
 ### 6.4 FCM 推送
 
-> 2026-09-10 生产验证：以下为接入流程，不是完成状态。当前前端加载 `firebase/messaging` 失败，关闭网页后的推送尚未完成联调；浏览器授予通知权限不能作为推送可用证据。详见 [生产验证记录](production-verification-2026-09-10.md)。
+使用已安装的 Firebase Web SDK、同源推送 Service Worker 和 OpenIM 原生 FCM 提供者。公开配置与 VAPID 公钥位于 `99chat/public/firebase-config.js`；Admin SDK 私钥只读挂载到服务端配置目录，不能进入前端或 Git。部署步骤及限制见 [FCM 部署说明](../server-patches/push/README.md)，验收结果见 [生产验证记录](production-verification-2026-09-10.md)。
+
+通知开关需等待 Worker 激活、获取 Token 并通过 SDK `updateFcmToken` 绑定成功才显示启用。偏好按账号保存；关闭、免打扰及主动退出撤销浏览器 Token。浏览器权限获准本身不是推送接通证据；Chrome 无痕模式不支持 Push API。
 
 ```
 Firebase Cloud Messaging 集成流程：

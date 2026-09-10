@@ -38,7 +38,7 @@ E2E_BASE=https://999.99chat99.com TEST_VERIFY_CODE=<环境验证码> node produc
 
 ## 尚不能判定为完成的范围
 
-- **关闭网页后的离线推送**：真实浏览器报 `Failed to resolve module specifier 'firebase/messaging'`。现有权限开关不等于推送接通，需要 Firebase Web 配置、推送 Service Worker 与服务端配置联调；已向用户询问配置。
+- **关闭网页后的离线推送（后续已接通）**：最初前端加载模块失败；收到 Firebase 配置后已接入并通过下方完整真实回归，范围为普通 Chrome、浏览器进程仍运行。
 - **同账号两个 Web 同时在线**：当前服务端 `multiLogin.policy: 1` 为同平台单实例。此次验证是顺序换浏览器恢复，没有变更全站登录策略，也不声称双 Web 同时在线通过。
 - **历史本机收藏迁移（后续已修复）**：原浏览器进入“我的收藏”，检测到当前账号未同步记录时会出现“同步本机收藏”。点击后迁移到服务器，按消息 ID 去重，跳过服务器已有记录，原 localStorage 保留。用户尚未点击的旧数据不能声称已经迁移。
 - 浏览器物理提示音、移动端震动、关闭网页后的系统通知，没有本轮真实设备证据。
@@ -50,3 +50,21 @@ E2E_BASE=https://999.99chat99.com TEST_VERIFY_CODE=<环境验证码> node produc
 `favorites_migration_e2e.cjs` 已在生产运行通过（退出 0）：先在旧页面因缺少迁移入口失败，再部署修复验证真实 API 写回、重复记录去重、服务器同 ID 内容保留、其他账号缓存不导入、原本机记录仍保留，刷新后不再提示重复迁移。测试收藏已通过 API 删除，独立测试账号保留。
 
 此功能需要在保存旧收藏的原浏览器操作，不能恢复已清空的浏览器数据或已失效的临时媒体 URL。登录策略与 Firebase 接入仍等待用户确认/配置，未在此次变更中修改。
+
+## Firebase 后续接入与实测
+
+用户随后提供服务账号文件。已部署 OpenIM 原生 FCM 配置并保留权限补丁镜像、收藏镜像、健康检查和 `multiLogin.policy: 1`。私钥存放于服务器仓库之外，权限 600，只读挂载；Git 仅保存公开 Web 配置、公钥和部署说明。
+
+`fcm_registration_e2e.cjs` 在生产最终完整执行退出 0，未模拟 FCM/通知对象：
+
+- 独立普通 Chrome 档案真实获取 Push 订阅和 FCM Token，OpenIM 绑定成功。
+- 两账号通过 UI 申请/同意好友；接收端离开应用页面，发送端发送消息。
+- 真实 OpenIM → FCM → Service Worker 链路在浏览器原生 `getNotifications()` 中出现通知。
+- 关闭通知后原生 Push 订阅为空；重新开启成功。
+- 退出账号等待撤销完成后进入登录页，确认订阅为空。
+
+修复过程中验证到：旧动态 import 无法加载、Firebase 核心包重复版本、Worker 首次激活时序、退出提前跳转，以及 Cloudflare 对固定脚本名缓存 30 天。现改用锁定 npm 依赖、同源 Worker 依赖、等待激活/撤销、可变脚本 `no-store` 及新注册地址 `?v=2`；公网响应已确认 `Cache-Control: no-store`、`CF-Cache-Status: BYPASS`。旧未带版本的 CDN 缓存仍建议在控制台清除。
+
+本地构建及脚本语法检查通过，Nginx 配置测试通过，OpenIM/Chat 均 healthy；主功能 `production_smoke_e2e.cjs` 本次也完整退出 0。Lint 退出 0，仍有既存警告；SDK 空数据初始化日志仍有 null/map、表尚未创建提示，不据此声称日志已全部清理。
+
+限制：Chrome 无痕模式明确拒绝 Push API；测试验证原生通知记录，不代表人工观察了系统横幅/扬声器，不覆盖 Safari/iOS、浏览器进程完全退出或多 Web 同时推送。独立测试账号和消息保留。配置步骤见 [FCM 部署说明](../server-patches/push/README.md)。

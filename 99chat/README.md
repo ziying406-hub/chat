@@ -22,6 +22,12 @@ docker compose up -d
 npm run build
 ```
 
+## 离线消息通知
+
+前端使用 Firebase Web SDK，后端使用 OpenIM 原生 FCM 提供者。用户在「通知设置 → 新消息通知」授权并完成 Token 绑定后启用，关闭通知或主动退出时撤销浏览器订阅。Chrome 无痕模式不支持 Web Push；普通浏览器也需允许系统通知并可访问 Google 推送服务。
+
+Firebase 公开 Web 配置位于 `public/firebase-config.js`。Admin SDK 私钥只能保存在服务器仓库外，不能放进此目录或 Git。部署和真实送达测试见 [FCM 配置说明](../server-patches/push/README.md)。
+
 ## 服务端收藏
 
 “我的收藏”由 99chat 增加了服务端持久化能力，不是 OpenIM 可通过配置开启的内置功能。收藏记录按当前登录用户隔离，保存到 MongoDB 的 `99chat_favorites` 集合；因此同一账号在不同浏览器或设备上登录后可以读取相同收藏。

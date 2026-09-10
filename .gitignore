@@ -2,6 +2,7 @@
 node_modules/
 dist/
 *.local
+*-firebase-adminsdk-*.json
 .vite/
 openim-docker
 # Separately versioned source for the local 99chat favorites API image.

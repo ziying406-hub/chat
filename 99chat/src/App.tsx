@@ -7,7 +7,8 @@ import InitialSetup from "./pages/InitialSetup";
 import Home from "./pages/Home";
 import MainLayout from "./components/layout/MainLayout";
 import { registerWebMCP } from "./webmcp";
-import { registerFCM } from "./services/openim";
+import { registerWebPush } from "./services/push";
+import { getUserStorageKey } from "./utils/storage";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthed = useAppStore((s) => s.isAuthed);
@@ -63,7 +64,10 @@ export default function App() {
   useEffect(() => {
     if (isAuthed) {
       registerWebMCP();
-      registerFCM();
+      const userID = useAppStore.getState().currentUser?.userID;
+      if (userID && localStorage.getItem(getUserStorageKey("99chat_notif_enabled", userID)) === "true") {
+        registerWebPush().catch(error => console.warn("恢复离线推送失败:", error.message));
+      }
     }
   }, [isAuthed]);
 
