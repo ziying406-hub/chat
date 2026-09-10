@@ -53,6 +53,28 @@ function clearSession() {
   localStorage.removeItem(SESSION_STORAGE_KEY);
 }
 
+function playMessageTone(userID?: string) {
+  if (!userID || localStorage.getItem(getUserStorageKey("99chat_mute_all", userID)) === "true" || localStorage.getItem(getUserStorageKey("99chat_sound_enabled", userID)) === "false") return;
+  const AudioContextCtor = window.AudioContext || (window as any).webkitAudioContext;
+  if (!AudioContextCtor) return;
+  try {
+    const context = new AudioContextCtor();
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.frequency.setValueAtTime(880, context.currentTime);
+    gain.gain.setValueAtTime(0.08, context.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.16);
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+    oscillator.onended = () => { void context.close(); };
+    oscillator.start();
+    oscillator.stop(context.currentTime + 0.16);
+    if (typeof context.resume === "function") void context.resume();
+  } catch (error) {
+    console.warn("message notification sound:", error);
+  }
+}
+
 function saveAccountToLocal(authData: AuthData, nickname: string, faceURL: string, phoneNumber: string) {
   try {
     const raw = localStorage.getItem("99chat_accounts");
@@ -197,6 +219,7 @@ export const useAppStore = create<AppState>()(
       });
       const receiveMessages = (incoming: MessageItem | MessageItem[]) => {
         const messages = Array.isArray(incoming) ? incoming : [incoming];
+        let receivedNewMessage = false;
         set((s) => {
           for (const msg of messages) {
             const peerUserID = msg.sendID === s.currentUser?.userID ? msg.recvID : msg.sendID;
@@ -207,10 +230,12 @@ export const useAppStore = create<AppState>()(
             if (!s.messagesMap[cid]) s.messagesMap[cid] = [];
             if (s.messagesMap[cid].find((m) => m.clientMsgID === msg.clientMsgID)) continue;
             s.messagesMap[cid].push(msg);
+            if (msg.sendID !== s.currentUser?.userID) receivedNewMessage = true;
             const conv = s.conversations.find((c) => c.conversationID === cid);
             if (conv && cid !== s.activeConversationID) conv.unreadCount++;
           }
         });
+        if (receivedNewMessage) playMessageTone(get().currentUser?.userID);
       };
       on(CbEvents.OnRecvNewMessage, receiveMessages);
       on(CbEvents.OnRecvNewMessages, receiveMessages);
