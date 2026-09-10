@@ -292,15 +292,15 @@ export default function GroupAdmin() {
             </div>
             <div className="px-5 py-4 border-b border-gray-50">
               <label className="text-sm text-gray-500 block mb-1">群名称</label>
-              <input readOnly={!isAdmin} value={groupName} onChange={(e) => setGroupName(e.target.value)} className="w-full px-3 py-2 bg-gray-50 rounded-lg text-sm outline-none focus:bg-white focus:ring-1 focus:ring-primary-200" />
+              {isAdmin ? <input value={groupName} onChange={(e) => setGroupName(e.target.value)} className="w-full px-3 py-2 bg-gray-50 rounded-lg text-sm outline-none focus:bg-white focus:ring-1 focus:ring-primary-200" /> : <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">{group.groupName}</p>}
             </div>
             <div className="px-5 py-4 border-b border-gray-50">
               <label className="text-sm text-gray-500 block mb-1">群公告</label>
-              <textarea readOnly={!isAdmin} value={announcement} onChange={(e) => setAnnouncement(e.target.value)} rows={3} className="w-full px-3 py-2 bg-gray-50 rounded-lg text-sm outline-none focus:bg-white focus:ring-1 focus:ring-primary-200 resize-none" />
+              {isAdmin ? <textarea value={announcement} onChange={(e) => setAnnouncement(e.target.value)} rows={3} className="w-full px-3 py-2 bg-gray-50 rounded-lg text-sm outline-none focus:bg-white focus:ring-1 focus:ring-primary-200 resize-none" /> : <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">{group.notification || "暂无公告"}</p>}
             </div>
             <div className="px-5 py-4 border-b border-gray-50">
               <label className="text-sm text-gray-500 block mb-1">群简介</label>
-              <textarea readOnly={!isAdmin} value={intro} onChange={(e) => setIntro(e.target.value)} rows={3} className="w-full px-3 py-2 bg-gray-50 rounded-lg text-sm outline-none focus:bg-white focus:ring-1 focus:ring-primary-200 resize-none" />
+              {isAdmin ? <textarea value={intro} onChange={(e) => setIntro(e.target.value)} rows={3} className="w-full px-3 py-2 bg-gray-50 rounded-lg text-sm outline-none focus:bg-white focus:ring-1 focus:ring-primary-200 resize-none" /> : <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">{group.introduction || "暂无简介"}</p>}
             </div>
             {isAdmin && (
               <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">

@@ -37,8 +37,9 @@ async function login(page, phone) {
     assert.equal(await member.getByRole('button', { name: '入群申请', exact: true }).count(), 0);
     assert.equal(await member.getByRole('button', { name: '保存', exact: true }).count(), 0);
     assert.equal(await member.getByRole('button', { name: '更换头像', exact: true }).count(), 0);
-    assert.equal(await member.locator('input[readonly]').count(), 1);
-    assert.equal(await member.locator('textarea[readonly]').count(), 2);
+    assert.equal(await member.locator('input[readonly]').count(), 0);
+    assert.equal(await member.locator('textarea').count(), 0);
+    await member.locator('p').filter({ hasText: name }).waitFor();
     const rejected = await member.evaluate(async (groupID) => {
       const { getIMSDK } = await import('/src/services/openim.ts');
       try {
@@ -63,6 +64,8 @@ async function login(page, phone) {
     await owner.getByRole('button', { name: /^取消管理员 / }).click();
     await member.getByRole('button', { name: '更换头像', exact: true }).waitFor({ state: 'detached' });
     assert.equal(await member.getByRole('button', { name: '保存', exact: true }).count(), 0);
+    assert.equal(await member.locator('textarea').count(), 0);
+    await member.getByText('管理员更新简介', { exact: true }).waitFor();
     console.log('PASS: ordinary member readonly and API rejection; administrator edit persisted; demotion removes permissions; owner can transfer to administrator');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exit(1); });
