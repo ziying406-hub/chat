@@ -1,0 +1,167 @@
+diff --git a/internal/api/chat/chat.go b/internal/api/chat/chat.go
+index 0e62543..fd96d04 100644
+--- a/internal/api/chat/chat.go
++++ b/internal/api/chat/chat.go
+@@ -32,14 +32,18 @@ import (
+ 	"github.com/openimsdk/tools/apiresp"
+ 	"github.com/openimsdk/tools/errs"
+ 	"github.com/openimsdk/tools/log"
++	"go.mongodb.org/mongo-driver/bson"
++	"go.mongodb.org/mongo-driver/mongo"
++	"go.mongodb.org/mongo-driver/mongo/options"
+ )
+ 
+-func New(chatClient chatpb.ChatClient, adminClient admin.AdminClient, imApiCaller imapi.CallerInterface, api *util.Api) *Api {
++func New(chatClient chatpb.ChatClient, adminClient admin.AdminClient, imApiCaller imapi.CallerInterface, api *util.Api, database *mongo.Database) *Api {
+ 	return &Api{
+ 		Api:         api,
+ 		chatClient:  chatClient,
+ 		adminClient: adminClient,
+ 		imApiCaller: imApiCaller,
++		favorites:   database.Collection("99chat_favorites"),
+ 	}
+ }
+ 
+@@ -48,6 +52,71 @@ type Api struct {
+ 	chatClient  chatpb.ChatClient
+ 	adminClient admin.AdminClient
+ 	imApiCaller imapi.CallerInterface
++	favorites   *mongo.Collection
++}
++
++type favorite struct {
++	UserID      string `bson:"userID" json:"-"`
++	ClientMsgID string `bson:"clientMsgID" json:"clientMsgID"`
++	SendID      string `bson:"sendID" json:"sendID"`
++	SenderName  string `bson:"senderName" json:"senderName"`
++	Content     string `bson:"content" json:"content"`
++	ContentType int32  `bson:"contentType" json:"contentType"`
++	Time        int64  `bson:"time" json:"time"`
++	Kind        string `bson:"kind" json:"kind"`
++	MediaURL    string `bson:"mediaURL" json:"mediaUrl"`
++	Duration    int32  `bson:"duration" json:"duration"`
++	FileName    string `bson:"fileName" json:"fileName"`
++}
++
++func (o *Api) ListFavorites(c *gin.Context) {
++	userID := mctx.GetOpUserID(c)
++	cursor, err := o.favorites.Find(c, bson.M{"userID": userID}, options.Find().SetSort(bson.D{{Key: "time", Value: -1}}))
++	if err != nil {
++		apiresp.GinError(c, err)
++		return
++	}
++	defer cursor.Close(c)
++	var items []favorite
++	if err = cursor.All(c, &items); err != nil {
++		apiresp.GinError(c, err)
++		return
++	}
++	apiresp.GinSuccess(c, items)
++}
++
++func (o *Api) SaveFavorite(c *gin.Context) {
++	var item favorite
++	if err := c.ShouldBindJSON(&item); err != nil || item.ClientMsgID == "" {
++		apiresp.GinError(c, errs.ErrArgs.WrapMsg("clientMsgID is empty"))
++		return
++	}
++	item.UserID = mctx.GetOpUserID(c)
++	if item.Time == 0 {
++		item.Time = time.Now().UnixMilli()
++	}
++	_, err := o.favorites.UpdateOne(c, bson.M{"userID": item.UserID, "clientMsgID": item.ClientMsgID}, bson.M{"$set": item}, options.Update().SetUpsert(true))
++	if err != nil {
++		apiresp.GinError(c, err)
++		return
++	}
++	apiresp.GinSuccess(c, item)
++}
++
++func (o *Api) DeleteFavorite(c *gin.Context) {
++	var req struct {
++		ClientMsgID string `json:"clientMsgID"`
++	}
++	if err := c.ShouldBindJSON(&req); err != nil || req.ClientMsgID == "" {
++		apiresp.GinError(c, errs.ErrArgs.WrapMsg("clientMsgID is empty"))
++		return
++	}
++	_, err := o.favorites.DeleteOne(c, bson.M{"userID": mctx.GetOpUserID(c), "clientMsgID": req.ClientMsgID})
++	if err != nil {
++		apiresp.GinError(c, err)
++		return
++	}
++	apiresp.GinSuccess(c, nil)
+ }
+ 
+ // ################## ACCOUNT ##################
+diff --git a/internal/api/chat/start.go b/internal/api/chat/start.go
+index d6a3671..02519b5 100644
+--- a/internal/api/chat/start.go
++++ b/internal/api/chat/start.go
+@@ -19,12 +19,16 @@ import (
+ 	disetcd "github.com/openimsdk/chat/pkg/common/kdisc/etcd"
+ 	adminclient "github.com/openimsdk/chat/pkg/protocol/admin"
+ 	chatclient "github.com/openimsdk/chat/pkg/protocol/chat"
++	"github.com/openimsdk/tools/db/mongoutil"
+ 	"github.com/openimsdk/tools/discovery/etcd"
+ 	"github.com/openimsdk/tools/errs"
+ 	"github.com/openimsdk/tools/mw"
+ 	"github.com/openimsdk/tools/system/program"
+ 	"github.com/openimsdk/tools/utils/datautil"
+ 	"github.com/openimsdk/tools/utils/runtimeenv"
++	"go.mongodb.org/mongo-driver/bson"
++	"go.mongodb.org/mongo-driver/mongo"
++	"go.mongodb.org/mongo-driver/mongo/options"
+ 	"google.golang.org/grpc"
+ 	"google.golang.org/grpc/credentials/insecure"
+ )
+@@ -33,6 +37,7 @@ type Config struct {
+ 	ApiConfig config.API
+ 	Discovery config.Discovery
+ 	Share     config.Share
++	Mongo     config.Mongo
+ 
+ 	RuntimeEnv string
+ }
+@@ -68,7 +73,18 @@ func Start(ctx context.Context, index int, cfg *Config) error {
+ 		ProxyHeader:     cfg.Share.ProxyHeader,
+ 		ChatAdminUserID: cfg.Share.ChatAdmin[0],
+ 	}
+-	adminApi := New(chatClient, adminClient, im, &base)
++	mongoClient, err := mongoutil.NewMongoDB(ctx, cfg.Mongo.Build())
++	if err != nil {
++		return err
++	}
++	_, err = mongoClient.GetDB().Collection("99chat_favorites").Indexes().CreateOne(ctx, mongo.IndexModel{
++		Keys:    bson.D{{Key: "userID", Value: 1}, {Key: "clientMsgID", Value: 1}},
++		Options: options.Index().SetUnique(true),
++	})
++	if err != nil {
++		return err
++	}
++	adminApi := New(chatClient, adminClient, im, &base, mongoClient.GetDB())
+ 	mwApi := chatmw.New(adminClient)
+ 	gin.SetMode(gin.ReleaseMode)
+ 	engine := gin.New()
+@@ -140,6 +156,9 @@ func SetChatRoute(router gin.IRouter, chat *Api, mw *chatmw.MW) {
+ 	user.POST("/search/full", chat.SearchUserFullInfo)        // Search user's public information
+ 	user.POST("/search/public", chat.SearchUserPublicInfo)    // Search all information of the user
+ 	user.POST("/rtc/get_token", chat.GetTokenForVideoMeeting) // Get token for video meeting for the user
++	user.POST("/favorites/list", chat.ListFavorites)
++	user.POST("/favorites/save", chat.SaveFavorite)
++	user.POST("/favorites/delete", chat.DeleteFavorite)
+ 
+ 	router.POST("/friend/search", mw.CheckToken, chat.SearchFriend)
+ 
+diff --git a/pkg/common/cmd/chat_api.go b/pkg/common/cmd/chat_api.go
+index 9c8da44..235d563 100644
+--- a/pkg/common/cmd/chat_api.go
++++ b/pkg/common/cmd/chat_api.go
+@@ -22,6 +22,7 @@ func NewChatApiCmd() *ChatApiCmd {
+ 		config.ShareFileName:           &ret.apiConfig.Share,
+ 		config.ChatAPIChatCfgFileName:  &ret.apiConfig.ApiConfig,
+ 		config.DiscoveryConfigFileName: &ret.apiConfig.Discovery,
++		config.MongodbConfigFileName:   &ret.apiConfig.Mongo,
+ 	}
+ 	ret.RootCmd = NewRootCmd(program.GetProcessName(), WithConfigMap(ret.configMap))
+ 	ret.ctx = context.WithValue(context.Background(), "version", config.Version)
