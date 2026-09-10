@@ -1,0 +1,48 @@
+diff --git a/internal/rpc/group/group.go b/internal/rpc/group/group.go
+index 6733516..398c55a 100644
+--- a/internal/rpc/group/group.go
++++ b/internal/rpc/group/group.go
+@@ -682,6 +682,9 @@ func (s *groupServer) getGroupMembersInfo(ctx context.Context, groupID string, u
+ 
+ // GetGroupApplicationList handles functions that get a list of group requests.
+ func (s *groupServer) GetGroupApplicationList(ctx context.Context, req *pbgroup.GetGroupApplicationListReq) (*pbgroup.GetGroupApplicationListResp, error) {
++	if err := authverify.CheckAccessV3(ctx, req.FromUserID, s.config.Share.IMAdminUserID); err != nil {
++		return nil, err
++	}
+ 	var (
+ 		groupIDs []string
+ 		err      error
+@@ -1366,6 +1369,9 @@ func (s *groupServer) GetGroupMembersCMS(ctx context.Context, req *pbgroup.GetGr
+ }
+ 
+ func (s *groupServer) GetUserReqApplicationList(ctx context.Context, req *pbgroup.GetUserReqApplicationListReq) (*pbgroup.GetUserReqApplicationListResp, error) {
++	if err := authverify.CheckAccessV3(ctx, req.UserID, s.config.Share.IMAdminUserID); err != nil {
++		return nil, err
++	}
+ 	user, err := s.userClient.GetUserInfo(ctx, req.UserID)
+ 	if err != nil {
+ 		return nil, err
+@@ -1615,6 +1621,13 @@ func (s *groupServer) SetGroupMemberInfo(ctx context.Context, req *pbgroup.SetGr
+ 		case 0:
+ 			if !isAppManagerUid {
+ 				roleLevel := dbMembers[opUserIndex].RoleLevel
++				if roleLevel != constant.GroupOwner {
++					for _, member := range members {
++						if member.RoleLevel != nil {
++							return nil, errs.ErrNoPermission.WrapMsg("only group owner can change member role")
++						}
++					}
++				}
+ 				var (
+ 					dbSelf  = &model.GroupMember{}
+ 					reqSelf *pbgroup.SetGroupMemberInfo
+@@ -1815,6 +1828,9 @@ func (s *groupServer) GetGroupMemberRoleLevel(ctx context.Context, req *pbgroup.
+ }
+ 
+ func (s *groupServer) GetGroupUsersReqApplicationList(ctx context.Context, req *pbgroup.GetGroupUsersReqApplicationListReq) (*pbgroup.GetGroupUsersReqApplicationListResp, error) {
++	if err := s.CheckGroupAdmin(ctx, req.GroupID); err != nil {
++		return nil, err
++	}
+ 	requests, err := s.db.FindGroupRequests(ctx, req.GroupID, req.UserIDs)
+ 	if err != nil {
+ 		return nil, err

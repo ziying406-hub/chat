@@ -56,3 +56,31 @@ npm run build
 以及退出后共用邀请操作被拒绝。
 权限单测覆盖管理员不能管理同级与群主、群主可以管理管理员、未加载身份不误判为群主。
 这些测试不代表所有群操作、所有异常路径都已逐项完成全量验收。
+
+## 服务端接口审计（2026-09-10）
+
+直接向本地 OpenIM `v3.8.3-patch.15` HTTP API 发请求，不经过前端或 SDK 权限保护。
+测试使用独立群主、管理员、普通成员、未入群申请者账号；拒绝请求后读取群资料、成员角色、
+禁言状态和申请处理状态，确认没有持久化副作用。测试脚本为 `99chat/group_permissions_api_test.mjs`。
+
+原镜像复现了以下缺口：
+
+| 接口 | 原行为 | 需要的服务端约束 |
+|---|---|---|
+| `set_group_member_info` | 群管理员可将普通成员提升为管理员，单条及混合批量请求均写入成功 | 角色变更仅群主或服务端应用管理员 |
+| `get_recv_group_applicationList` | 普通成员伪造群主 `fromUserID` 后读到审批记录 | 校验查询身份 |
+| `get_user_req_group_applicationList` | 普通成员查询别人的 `userID` 后读到申请记录 | 仅查询本人或服务端应用管理员授权查询 |
+| `get_group_users_req_application_list` | 普通成员读取指定群的批量申请记录 | 校验该群管理权限 |
+
+根因及最小服务端补丁保存在 [server-patches](../server-patches/README.md)。这不是前端开关，
+必须切换修补后的 OpenIM 镜像才对对应环境生效；前端发布不代表后端已修补。
+上游源码参考：[群 RPC 实现](https://github.com/openimsdk/open-im-server/blob/v3.8.3-patch.15/internal/rpc/group/group.go)。
+
+本地修补镜像 `99chat/openim-server:group-permissions` 已运行通过 45 个拒绝用例，
+含混合批量更新的无部分写入验证；本人申请查询、管理员读取审批、本人群昵称、资料编辑、
+审批、禁言/取消禁言、踢人、转让、退群和清理解散也有成功路径及结果回查。
+这份结果仅针对本地镜像，生产服务器尚未切换。
+同一修补镜像下，`group_permissions_test.mjs`、`group_permissions_e2e.cjs` 和
+`group_application_e2e.cjs` 全部通过，覆盖浏览器角色变化和实际审批入群流程。
+
+本轮范围不包含消息、好友、收藏等其他模块，也不代表对整个 OpenIM 服务完成全面安全审计。
