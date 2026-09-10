@@ -1,6 +1,6 @@
 # OpenIM 群权限补丁
 
-基于 `openim/openim-server:v3.8.3-patch.15`，仅替换 `openim-rpc-group`，沿用原镜像启动方式、配置和其他服务。
+基于 `openim/openim-server:v3.8.3-patch.15`，替换群权限服务及 Web 多登录涉及的 `openim-rpc-auth`、`openim-msggateway`，沿用原镜像启动方式、配置和其他服务。
 补丁对应上游 tag 源码（commit `865bb89517b48493ef9b1b5d9fde87fe0cb05cc7`），不涉及数据库迁移。
 
 ## 修复范围
@@ -38,3 +38,23 @@ API 测试固定访问 localhost 的 10002/10008，创建四个独立账号和�
 2026-09-10 已部署生产版本 `99chat/openim-server:permissions-7272acb`，
 45 项接口权限回归通过。实际生产配置位置、备份及验证范围见
 [群权限发布记录](../docs/group-permissions.md#生产发布)。
+
+## 仅 Web 多实例登录
+
+`web-multilogin.patch` 在 `multiLogin.policy: 1` 下只放开 `WebPlatformID=5`：
+
+- Auth 保留已有 Web Token，仍按 `maxNumOneEnd` 限制数量（生产为 30）。其他平台登录也不会顺带清除 Web Token。
+- 网关不再踢掉同账号的其他 Web 连接；非 Web 互踢分支保持原逻辑，其他 policy 不变。
+- 不改数据库，不新增登录 API，不改变群权限或收藏服务。
+- 多 Web 在线不等于多 Web 离线推送；原生 FCM 仍每用户/平台保存一个 Token。
+
+镜像构建中运行 `TestWebOnlyMultiLogin`，包括 Web 共存、非 Web 登录保留 Web、Web 登录保留其他平台、30 个凭据上限。真实浏览器回归：
+
+```sh
+cd 99chat
+E2E_BASE=https://<部署域名> TEST_VERIFY_CODE=<环境验证码> node web_multilogin_e2e.cjs
+```
+
+测试用独立账号验证双 Web Token、双端收发、刷新和单端退出；通过真实平台登录/API 验证 iOS、Android、Windows、Mac 仍互踢旧 Token。不代表原生客户端 UI 已实测。
+
+生产候选镜像 `99chat/openim-server:web-only-multilogin`；Compose 仍保留 `policy: 1` 和 Firebase 挂载。回滚使用 `/opt/openim/backups/compose.before-web-multilogin.yml` 中原配置，再仅重建 `openim-server`，不要删除数据卷。

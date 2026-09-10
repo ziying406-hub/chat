@@ -39,7 +39,7 @@ E2E_BASE=https://999.99chat99.com TEST_VERIFY_CODE=<环境验证码> node produc
 ## 尚不能判定为完成的范围
 
 - **关闭网页后的离线推送（后续已接通）**：最初前端加载模块失败；收到 Firebase 配置后已接入并通过下方完整真实回归，范围为普通 Chrome、浏览器进程仍运行。
-- **同账号两个 Web 同时在线**：当前服务端 `multiLogin.policy: 1` 为同平台单实例。此次验证是顺序换浏览器恢复，没有变更全站登录策略，也不声称双 Web 同时在线通过。
+- **同账号两个 Web 同时在线（后续已完成）**：原生 `policy: 1` 会互踢；用户确认只放开 Web 后部署定向补丁，详见下方回归。非 Web 单实例规则保留。
 - **历史本机收藏迁移（后续已修复）**：原浏览器进入“我的收藏”，检测到当前账号未同步记录时会出现“同步本机收藏”。点击后迁移到服务器，按消息 ID 去重，跳过服务器已有记录，原 localStorage 保留。用户尚未点击的旧数据不能声称已经迁移。
 - 浏览器物理提示音、移动端震动、关闭网页后的系统通知，没有本轮真实设备证据。
 
@@ -68,3 +68,17 @@ E2E_BASE=https://999.99chat99.com TEST_VERIFY_CODE=<环境验证码> node produc
 本地构建及脚本语法检查通过，Nginx 配置测试通过，OpenIM/Chat 均 healthy；主功能 `production_smoke_e2e.cjs` 本次也完整退出 0。Lint 退出 0，仍有既存警告；SDK 空数据初始化日志仍有 null/map、表尚未创建提示，不据此声称日志已全部清理。
 
 限制：Chrome 无痕模式明确拒绝 Push API；测试验证原生通知记录，不代表人工观察了系统横幅/扬声器，不覆盖 Safari/iOS、浏览器进程完全退出或多 Web 同时推送。独立测试账号和消息保留。配置步骤见 [FCM 部署说明](../server-patches/push/README.md)。
+
+## 仅 Web 多登录后续验证
+
+用户确认“只放开 Web”后，已部署 `99chat/openim-server:web-only-multilogin`。`policy: 1`、`maxNumOneEnd: 30` 未改；只替换 Auth 和网关的 Web 互踢行为，保留群权限补丁及 Firebase 只读挂载。Chat/收藏镜像未变。
+
+`web_multilogin_e2e.cjs` 先在旧服务上因“第二个 Web 登录导致第一个 Token 失效”断言失败；部署后完整退出 0：
+
+- 同账号两个独立浏览器上下文的 IM Token 均有效。
+- iOS/Android/Windows/Mac 真实登录 API 的第二个 Token 有效、旧 Token 失效，同时两个 Web Token 仍有效（不是原生客户端 UI 测试）。
+- 两个 Web 各自发送消息，另一账号真实收到；另一账号回复时两个 Web 都真实收到。
+- 刷新一个 Web 后，两端继续收到新消息。
+- 退出其中一个 Web，另一个继续双向收发。
+
+Go `TestWebOnlyMultiLogin` 本地及生产镜像构建内通过，包括 Web 30 个凭据上限。更新后的 `fcm_registration_e2e.cjs` 回归完整退出 0，真实离线送达、关闭和退出撤销继续通过。服务恢复 healthy。测试账号与测试消息保留；没有修改业务群或删除数据库数据。回滚配置备份位于 `/opt/openim/backups/compose.before-web-multilogin.yml`，原镜像 `99chat/openim-server:permissions-7272acb` 保留。

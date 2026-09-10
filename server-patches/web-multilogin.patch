@@ -1,0 +1,36 @@
+diff --git a/internal/msggateway/ws_server.go b/internal/msggateway/ws_server.go
+index 404751d..406223c 100644
+--- a/internal/msggateway/ws_server.go
++++ b/internal/msggateway/ws_server.go
+@@ -386,6 +386,9 @@ func (ws *WsServer) multiTerminalLoginChecker(clientOK bool, oldClients []*Clien
+ 
+ 		fallthrough
+ 	case constant.AllLoginButSameTermKick:
++		if ws.msgGatewayConfig.Share.MultiLogin.Policy == constant.AllLoginButSameTermKick && newClient.PlatformID == constant.WebPlatformID {
++			return
++		}
+ 		if !clientOK {
+ 			return
+ 		}
+diff --git a/pkg/common/storage/controller/auth.go b/pkg/common/storage/controller/auth.go
+index f9061a7..3d3e754 100644
+--- a/pkg/common/storage/controller/auth.go
++++ b/pkg/common/storage/controller/auth.go
+@@ -162,6 +162,17 @@ func (a *authDatabase) checkToken(ctx context.Context, tokens map[int]map[string
+ 		}
+ 	case constant.AllLoginButSameTermKick:
+ 		for plt, ts := range loginTokenMap {
++			// Web browsers may coexist; keep the configured per-platform token cap.
++			if plt == constant.WebPlatformID {
++				count := len(ts)
++				if platformID == plt {
++					count++
++				}
++				if count > a.multiLogin.MaxNumOneEnd {
++					kickToken = append(kickToken, ts[:count-a.multiLogin.MaxNumOneEnd]...)
++				}
++				continue
++			}
+ 			kickToken = append(kickToken, ts[:len(ts)-1]...)
+ 			if plt == platformID {
+ 				kickToken = append(kickToken, ts[len(ts)-1])

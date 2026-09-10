@@ -726,6 +726,8 @@ if ('serviceWorker' in navigator) {
 
 ### 6.4 FCM 推送
 
+Web 多实例登录：服务端保持 `multiLogin.policy: 1`，通过 [Web 登录补丁](../server-patches/README.md#仅-web-多实例登录) 仅豁免平台 5 的 Token/网关互踢，其他平台限制不变；生产 `maxNumOneEnd: 30`。FCM 每平台单 Token 的限制独立于在线连接策略。
+
 使用已安装的 Firebase Web SDK、同源推送 Service Worker 和 OpenIM 原生 FCM 提供者。公开配置与 VAPID 公钥位于 `99chat/public/firebase-config.js`；Admin SDK 私钥只读挂载到服务端配置目录，不能进入前端或 Git。部署步骤及限制见 [FCM 部署说明](../server-patches/push/README.md)，验收结果见 [生产验证记录](production-verification-2026-09-10.md)。
 
 通知开关需等待 Worker 激活、获取 Token 并通过 SDK `updateFcmToken` 绑定成功才显示启用。偏好按账号保存；关闭、免打扰及主动退出撤销浏览器 Token。浏览器权限获准本身不是推送接通证据；Chrome 无痕模式不支持 Push API。

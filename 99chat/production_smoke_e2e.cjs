@@ -187,7 +187,7 @@ async function login(page, user) {
     await c.locator('.break-words').filter({ hasText: message }).first().waitFor();
     await c.waitForFunction(() => [...document.querySelectorAll('[data-message-type="image"]')].some(img => img.naturalWidth > 0));
     console.log('PASS fresh browser login retrieves server favorites and message/image history');
-    console.log('LIMIT: production multiLogin.policy=1 allows one simultaneous web instance; this test verifies sequential browser migration, not simultaneous web login');
+    console.log('SCOPE: sequential browser migration verified here; simultaneous Web login is covered by web_multilogin_e2e.cjs');
   } catch (error) {
     for (const [index,page] of pages.entries()) {
       if (page.isClosed()) continue;
