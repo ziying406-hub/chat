@@ -79,8 +79,28 @@ npm run build
 本地修补镜像 `99chat/openim-server:group-permissions` 已运行通过 45 个拒绝用例，
 含混合批量更新的无部分写入验证；本人申请查询、管理员读取审批、本人群昵称、资料编辑、
 审批、禁言/取消禁言、踢人、转让、退群和清理解散也有成功路径及结果回查。
-这份结果仅针对本地镜像，生产服务器尚未切换。
+上述为本地验证结果；生产发布结果见下方。
 同一修补镜像下，`group_permissions_test.mjs`、`group_permissions_e2e.cjs` 和
 `group_application_e2e.cjs` 全部通过，覆盖浏览器角色变化和实际审批入群流程。
 
 本轮范围不包含消息、好友、收藏等其他模块，也不代表对整个 OpenIM 服务完成全面安全审计。
+
+### 生产发布
+
+2026-09-10 09:52 UTC，按用户授权完成生产 OpenIM 重启，运行镜像为
+`99chat/openim-server:permissions-7272acb`，对应补丁提交 `7272acb`。
+生产 Compose：`/opt/openim/docker-compose-custom.yml`，只更换 `openim-server` 的镜像字段。
+没有重启数据库、没有数据迁移，也没有重建前端。
+
+将同一 API 回归脚本的两个地址改为生产 Docker 网络中的服务名后执行，其他断言不变：
+45 个拒绝用例及合法操作全部通过，退出码 0。仅使用新建的四个独立测试账号和临时群；
+测试群已解散，四个测试账号保留，没有修改既有业务群。
+OpenIM 健康检查通过；公网首页 HTTP 200，API 代理正常响应鉴权错误；
+浏览器刷新后保留登录并显示群资料，普通成员设置仍为只读。
+
+回滚镜像：`99chat/openim-server:before-7272acb`。
+原 Compose 和服务配置备份在 `/opt/openim/backups/group-permissions-7272acb/`。
+需要回滚时恢复该目录的 Compose，再仅重建 `openim-server`，不删除数据卷。
+
+发布前已存在的独立问题：`openim-chat` 健康检查调用缺失的 `mage`，显示 unhealthy；
+本轮真实注册及 API 验证成功，未改动该健康检查配置。
