@@ -276,6 +276,7 @@ export const useAppStore = create<AppState>()(
       on(CbEvents.OnJoinedGroupAdded, refreshJoinedGroups);
       on(CbEvents.OnJoinedGroupDeleted, refreshJoinedGroups);
       on(CbEvents.OnGroupDismissed, refreshJoinedGroups);
+      on(CbEvents.OnGroupInfoChanged, refreshJoinedGroups);
       const refreshGroupMembers = (member: GroupMemberItem) => {
         if (!member?.groupID) return;
         im.getGroupMemberList({ groupID: member.groupID, filter: GroupMemberFilter.All, offset: 0, count: 1000 }).then((res) => {

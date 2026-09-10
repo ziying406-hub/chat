@@ -32,8 +32,8 @@ async function login(page, phone, password) {
   if (!groupID) throw new Error('Could not resolve created group ID.');
 
   await owner.getByText('入群方式', { exact: true }).click();
-  await owner.getByText('需要审批入群', { exact: true }).click();
-  await owner.getByText('需要审批入群', { exact: true }).last().waitFor({ state: 'visible', timeout: 15000 });
+  await owner.getByText('申请和邀请均需审批', { exact: true }).click();
+  await owner.getByText('申请和邀请均需审批', { exact: true }).last().waitFor({ state: 'visible', timeout: 15000 });
   await login(applicant, '13700137000', 'test123456');
   const joinResult = await applicant.evaluate(async (targetGroupID) => {
     const { getIMSDK } = await import('/src/services/openim.ts');

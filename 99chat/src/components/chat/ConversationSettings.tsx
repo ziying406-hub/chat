@@ -4,6 +4,7 @@ import { ArrowLeft, BellOff, ChevronRight, EyeOff, Image as ImageIcon, Pin, Sear
 import { SessionType } from "@openim/wasm-client-sdk";
 import { useAppStore } from "../../store/app-store";
 import { getIMSDK } from "../../services/openim";
+import { groupPermissions } from "../../utils/group-permissions";
 
 export default function ConversationSettings() {
   const { id } = useParams();
@@ -11,6 +12,8 @@ export default function ConversationSettings() {
   const conv = useAppStore((s) => s.conversations.find((item) => item.conversationID === id));
   const groups = useAppStore((s) => s.groups);
   const currentUser = useAppStore((s) => s.currentUser);
+  const groupMembers = useAppStore((s) => s.groupMembersMap);
+  const loadMembers = useAppStore((s) => s.loadGroupMembers);
   const pinConversation = useAppStore((s) => s.pinConversation);
   const muteConversation = useAppStore((s) => s.muteConversation);
   const deleteConversation = useAppStore((s) => s.deleteConversation);
@@ -28,6 +31,10 @@ export default function ConversationSettings() {
     setBurnEnabled(Boolean((conv as any)?.isMsgDestruct));
   }, [conv]);
 
+  useEffect(() => {
+    if (conv?.groupID) loadMembers(conv.groupID);
+  }, [conv?.groupID, loadMembers]);
+
   if (!id || !conv) {
     return <div className="flex-1 flex items-center justify-center text-sm text-gray-300">会话不存在</div>;
   }
@@ -36,8 +43,8 @@ export default function ConversationSettings() {
   const group = isGroup ? groups.find((item) => item.groupID === conv.groupID) : null;
   const muted = conv.recvMsgOpt !== 0;
   const pinned = Boolean((conv as any).isPinned);
-  const isOwner = group?.ownerUserID === currentUser?.userID;
-  const joinMethod = group?.needVerification === 0 ? "无需审批" : group?.needVerification === 1 ? "需群主确认" : "禁止入群";
+  const { isOwner, canManage } = groupPermissions(group?.ownerUserID, currentUser?.userID, groupMembers[group?.groupID || ""] || []);
+  const joinMethod = group?.needVerification === 0 ? "申请需审批，邀请直接入群" : group?.needVerification === 1 ? "申请和邀请均需审批" : "无需审批入群";
 
   const run = async (kind: "burn" | "mute" | "pin", action: () => Promise<void>) => {
     setBusy(kind);
@@ -131,7 +138,7 @@ export default function ConversationSettings() {
       {isGroup && group && (
         <div className="mt-2 bg-white border-y border-gray-100">
           <Row label="群组管理" icon={<Users size={18} className="text-gray-400" />} onClick={() => navigate(`/messages/groups/admin/${group.groupID}`)} />
-          <Row label="入群申请" onClick={() => navigate(`/messages/groups/admin/${group.groupID}?tab=applications`)} />
+          {canManage && <Row label="入群申请" onClick={() => navigate(`/messages/groups/admin/${group.groupID}?tab=applications`)} />}
           <Row label="入群方式" value={joinMethod} onClick={() => navigate(`/contact/group/${group.groupID}`)} />
           <Row label="群公告" onClick={() => navigate(`/contact/group/${group.groupID}`)} />
           <Row label="群二维码" onClick={() => navigate(`/contact/group/${group.groupID}`)} />

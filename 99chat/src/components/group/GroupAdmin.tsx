@@ -6,6 +6,7 @@ import {
 import { useAppStore } from "../../store/app-store";
 import { getIMSDK } from "../../services/openim";
 import { GroupMemberRole, GroupStatus } from "@openim/wasm-client-sdk";
+import { groupPermissions } from "../../utils/group-permissions";
 
 type AdminTab = "members" | "admins" | "applications" | "settings";
 
@@ -44,14 +45,19 @@ export default function GroupAdmin() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [avatarError, setAvatarError] = useState("");
   const [avatarSaved, setAvatarSaved] = useState(false);
+  const [actionError, setActionError] = useState("");
 
   const group = groups.find((g) => g.groupID === id);
-  const isOwner = group?.ownerUserID === currentUser?.userID;
-  const isAdmin = members.some((m) => m.userID === currentUser?.userID && m.roleLevel >= GroupMemberRole.Admin);
+  const { isOwner, canManage: isAdmin, canInvite, canManageMember } = groupPermissions(group?.ownerUserID, currentUser?.userID, members);
 
   useEffect(() => {
-    if (id) { loadMembers(id); loadGroupApps(); }
+    if (id) loadMembers(id);
   }, [id]);
+
+  useEffect(() => {
+    if (isAdmin) loadGroupApps();
+    else if (tab === "applications") setTab("members");
+  }, [isAdmin, tab, loadGroupApps]);
 
   useEffect(() => {
     if (group) {
@@ -68,13 +74,17 @@ export default function GroupAdmin() {
   const pendingApps = groupRequests.filter((r: any) => r.groupID === id);
 
   const handleSave = async () => {
-    await setGroupInfo(id!, { groupName, notification: announcement, introduction: intro });
+    if (!isAdmin) return;
+    setActionError("");
+    try {
+      await setGroupInfo(id!, { groupName, notification: announcement, introduction: intro });
+    } catch { setActionError("保存失败，请检查当前群权限后重试"); }
   };
 
   const handleAvatarChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
-    if (!file || !isOwner || uploadingAvatar) return;
+    if (!file || !isAdmin || uploadingAvatar) return;
     setAvatarError("");
     setAvatarSaved(false);
     setUploadingAvatar(true);
@@ -91,18 +101,21 @@ export default function GroupAdmin() {
   };
 
   const handleMute = async (member: typeof members[number]) => {
+    if (!canManageMember(member)) return;
     const muted = Boolean(member.muteEndTime && member.muteEndTime > Date.now() / 1000);
     await muteMember(id!, member.userID, muted ? 0 : 3600);
   };
 
   const handleKick = async (userID: string) => {
+    const target = members.find((member) => member.userID === userID);
+    if (!target || !canManageMember(target)) return;
     if (!confirm("确定移出该成员？")) return;
     await kickFromGroup(id!, [userID], "管理员移出");
     await loadMembers(id!);
   };
 
   const handleGroupMute = async () => {
-    if (!id) return;
+    if (!id || !isAdmin) return;
     setUpdatingGroupMute(true);
     try {
       await muteGroup(id, group.status !== GroupStatus.Muted);
@@ -112,13 +125,13 @@ export default function GroupAdmin() {
   };
 
   const handleTransferOwner = async (member: typeof members[number]) => {
-    if (!id || !confirm(`确定将群主转让给 ${member.nickname || member.userID}？`)) return;
+    if (!id || !isOwner || !canManageMember(member) || !confirm(`确定将群主转让给 ${member.nickname || member.userID}？`)) return;
     await transferGroupOwner(id, member.userID);
     await loadMembers(id);
   };
 
   const handleSetAdmin = async (member: typeof members[number]) => {
-    if (!id) return;
+    if (!id || !isOwner || !canManageMember(member)) return;
     const nextRole = member.roleLevel === GroupMemberRole.Admin ? GroupMemberRole.Normal : GroupMemberRole.Admin;
     await setGroupMemberRole(id, member.userID, nextRole);
   };
@@ -163,7 +176,7 @@ export default function GroupAdmin() {
 
       {/* Tabs */}
       <div className="flex gap-1 bg-white px-4 py-2 border-b border-gray-50">
-        {(["members", "admins", "applications", "settings"] as AdminTab[]).map((t) => (
+        {(["members", "admins", "applications", "settings"] as AdminTab[]).filter((t) => t !== "applications" || isAdmin).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -182,7 +195,7 @@ export default function GroupAdmin() {
             <div className="px-5 py-3 border-b border-gray-50 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-500">群成员（{members.length}）</span>
-                {isAdmin && (
+                {canInvite && (
                   <button onClick={() => setShowInvite(true)} className="text-sm text-primary-500 flex items-center gap-1"><UserPlus size={16} /> 邀请</button>
                 )}
               </div>
@@ -203,12 +216,12 @@ export default function GroupAdmin() {
                   </div>
                   <span className="text-xs text-gray-400">{m.roleLevel === GroupMemberRole.Owner ? "群主" : m.roleLevel === GroupMemberRole.Admin ? "管理员" : "成员"}</span>
                 </div>
-                {isAdmin && m.roleLevel < GroupMemberRole.Owner && m.userID !== currentUser?.userID && (
+                {canManageMember(m) && (
                   <div className="flex gap-1">
                     {isOwner && <button aria-label={`${m.roleLevel === GroupMemberRole.Admin ? "取消管理员" : "设为管理员"} ${m.nickname || m.userID}`} onClick={() => handleSetAdmin(m)} className="w-8 h-8 rounded-lg bg-blue-50 text-blue-500 hover:bg-blue-100 flex items-center justify-center"><Shield size={14} /></button>}
-                    {isOwner && m.roleLevel < GroupMemberRole.Admin && <button aria-label={`转让群主 ${m.nickname || m.userID}`} onClick={() => handleTransferOwner(m)} className="w-8 h-8 rounded-lg bg-amber-50 text-amber-500 hover:bg-amber-100 flex items-center justify-center"><Crown size={14} /></button>}
-                    {m.roleLevel < GroupMemberRole.Admin && <button aria-label={`${m.muteEndTime && m.muteEndTime > Date.now() / 1000 ? "解除禁言" : "禁言"} ${m.nickname || m.userID}`} onClick={() => handleMute(m)} className="w-8 h-8 rounded-lg bg-gray-50 text-gray-400 hover:bg-gray-100 flex items-center justify-center"><VolumeX size={14} /></button>}
-                    {m.roleLevel < GroupMemberRole.Admin && <button aria-label={`移除 ${m.nickname || m.userID}`} onClick={() => handleKick(m.userID)} className="w-8 h-8 rounded-lg bg-red-50 text-red-400 hover:bg-red-100 flex items-center justify-center"><UserMinus size={14} /></button>}
+                    {isOwner && <button aria-label={`转让群主 ${m.nickname || m.userID}`} onClick={() => handleTransferOwner(m)} className="w-8 h-8 rounded-lg bg-amber-50 text-amber-500 hover:bg-amber-100 flex items-center justify-center"><Crown size={14} /></button>}
+                    {canManageMember(m) && <button aria-label={`${m.muteEndTime && m.muteEndTime > Date.now() / 1000 ? "解除禁言" : "禁言"} ${m.nickname || m.userID}`} onClick={() => handleMute(m)} className="w-8 h-8 rounded-lg bg-gray-50 text-gray-400 hover:bg-gray-100 flex items-center justify-center"><VolumeX size={14} /></button>}
+                    {canManageMember(m) && <button aria-label={`移除 ${m.nickname || m.userID}`} onClick={() => handleKick(m.userID)} className="w-8 h-8 rounded-lg bg-red-50 text-red-400 hover:bg-red-100 flex items-center justify-center"><UserMinus size={14} /></button>}
                   </div>
                 )}
               </div>
@@ -237,7 +250,7 @@ export default function GroupAdmin() {
         )}
 
         {/* Applications tab */}
-        {tab === "applications" && (
+        {tab === "applications" && isAdmin && (
           <div className="bg-white">
             {pendingApps.length === 0 && (
               <div className="flex flex-col items-center justify-center py-20 text-gray-300 text-sm gap-2">
@@ -267,29 +280,29 @@ export default function GroupAdmin() {
               <p className="text-sm text-gray-500 mb-3">群头像</p>
               <div className="flex items-center gap-4">
                 <img src={group.faceURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${group.groupID}`} alt="群头像" className="w-16 h-16 rounded-2xl object-cover bg-gray-100" />
-                {isOwner ? (
+                {isAdmin ? (
                   <>
                     <button onClick={() => avatarInput.current?.click()} disabled={uploadingAvatar} className="px-4 py-2 rounded-lg bg-primary-50 text-primary-600 text-sm hover:bg-primary-100 disabled:opacity-50">{uploadingAvatar ? "上传中..." : "更换头像"}</button>
                     <input ref={avatarInput} type="file" accept="image/*" aria-label="上传群头像" className="hidden" onChange={handleAvatarChange} />
                   </>
-                ) : <span className="text-xs text-gray-400">仅群主可更换头像</span>}
+                ) : <span className="text-xs text-gray-400">仅群主和管理员可更换头像</span>}
               </div>
               {avatarError && <p role="alert" className="text-sm text-red-500 mt-2">{avatarError}</p>}
               {avatarSaved && <p role="status" className="text-sm text-primary-600 mt-2">群头像已更新</p>}
             </div>
             <div className="px-5 py-4 border-b border-gray-50">
               <label className="text-sm text-gray-500 block mb-1">群名称</label>
-              <input value={groupName} onChange={(e) => setGroupName(e.target.value)} className="w-full px-3 py-2 bg-gray-50 rounded-lg text-sm outline-none focus:bg-white focus:ring-1 focus:ring-primary-200" />
+              <input readOnly={!isAdmin} value={groupName} onChange={(e) => setGroupName(e.target.value)} className="w-full px-3 py-2 bg-gray-50 rounded-lg text-sm outline-none focus:bg-white focus:ring-1 focus:ring-primary-200" />
             </div>
             <div className="px-5 py-4 border-b border-gray-50">
               <label className="text-sm text-gray-500 block mb-1">群公告</label>
-              <textarea value={announcement} onChange={(e) => setAnnouncement(e.target.value)} rows={3} className="w-full px-3 py-2 bg-gray-50 rounded-lg text-sm outline-none focus:bg-white focus:ring-1 focus:ring-primary-200 resize-none" />
+              <textarea readOnly={!isAdmin} value={announcement} onChange={(e) => setAnnouncement(e.target.value)} rows={3} className="w-full px-3 py-2 bg-gray-50 rounded-lg text-sm outline-none focus:bg-white focus:ring-1 focus:ring-primary-200 resize-none" />
             </div>
             <div className="px-5 py-4 border-b border-gray-50">
               <label className="text-sm text-gray-500 block mb-1">群简介</label>
-              <textarea value={intro} onChange={(e) => setIntro(e.target.value)} rows={3} className="w-full px-3 py-2 bg-gray-50 rounded-lg text-sm outline-none focus:bg-white focus:ring-1 focus:ring-primary-200 resize-none" />
+              <textarea readOnly={!isAdmin} value={intro} onChange={(e) => setIntro(e.target.value)} rows={3} className="w-full px-3 py-2 bg-gray-50 rounded-lg text-sm outline-none focus:bg-white focus:ring-1 focus:ring-primary-200 resize-none" />
             </div>
-            {isOwner && (
+            {isAdmin && (
               <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-700">全员禁言</p>
@@ -300,9 +313,10 @@ export default function GroupAdmin() {
                 </button>
               </div>
             )}
-            <div className="px-5 py-4">
+            {actionError && <p role="alert" className="px-5 text-sm text-red-500">{actionError}</p>}
+            {isAdmin && <div className="px-5 py-4">
               <button onClick={handleSave} className="w-full py-2.5 bg-primary-500 text-white rounded-xl text-sm font-medium hover:bg-primary-600 transition-colors">保存</button>
-            </div>
+            </div>}
             <div className="px-5 py-3 border-t border-gray-50">
               {isOwner ? (
                 <button onClick={() => { if (confirm("确定解散群组？")) { dismissGroup(id!); navigate("/contact/groups"); } }} className="w-full text-left text-sm text-red-400 hover:text-red-500 flex items-center gap-2 py-2"><LogOut size={16} /> 解散群组</button>

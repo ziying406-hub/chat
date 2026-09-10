@@ -4,6 +4,7 @@ import { ArrowLeft, Users, Volume2, LogOut, Crown, Shield, QrCode, Settings as S
 import { useAppStore } from "../../store/app-store";
 import { getIMSDK } from "../../services/openim";
 import { GroupMemberRole } from "@openim/wasm-client-sdk";
+import { groupPermissions } from "../../utils/group-permissions";
 
 export default function GroupDetail() {
   const { id } = useParams();
@@ -32,6 +33,7 @@ export default function GroupDetail() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const group = groups.find((g) => g.groupID === id);
+  const { canManage } = groupPermissions(group?.ownerUserID, currentUser?.userID, members);
 
   useEffect(() => {
     if (id) loadMembers(id);
@@ -78,13 +80,13 @@ export default function GroupDetail() {
 
   const handleUploadAvatar = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !id) return;
+    if (!file || !id || !canManage) return;
     const url = await uploadAvatar(file);
     if (url) await setGroupInfo(id, { faceURL: url });
   };
 
   const handleJoinMethodChange = async (val: number) => {
-    if (!id) return;
+    if (!id || !canManage) return;
     await setGroupInfo(id, { needVerification: val } as any);
     setShowJoinMethod(false);
   };
@@ -118,7 +120,7 @@ export default function GroupDetail() {
         <div className="bg-white px-6 py-6 flex items-center gap-4 border-b border-gray-50">
           <div className="relative">
             <img src={group.faceURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${group.groupID}`} alt="" className="w-16 h-16 rounded-2xl object-cover bg-gray-100" />
-            {group.ownerUserID === currentUser?.userID && (
+            {canManage && (
               <button
                 onClick={() => fileInputRef.current?.click()}
                 className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-primary-500 flex items-center justify-center text-white shadow-sm hover:bg-primary-600 transition-colors"
@@ -144,7 +146,7 @@ export default function GroupDetail() {
           <p className="text-sm text-gray-400">{group.introduction || "暂无简介"}</p>
         </div>
 
-        {group.ownerUserID === currentUser?.userID && (
+        {canManage && (
           <div className="bg-white mt-2 border-y border-gray-50">
             <div className="relative">
               <button
@@ -153,15 +155,15 @@ export default function GroupDetail() {
               >
                 <span>入群方式</span>
                 <span className="flex items-center gap-1 text-xs text-gray-400">
-                  {needVerification === 0 ? "无需审批入群" : needVerification === 1 ? "需要审批入群" : "禁止入群"}
+                  {needVerification === 0 ? "申请需审批，邀请直接入群" : needVerification === 1 ? "申请和邀请均需审批" : "无需审批入群"}
                   <ChevronDown size={14} />
                 </span>
               </button>
               {showJoinMethod && (
                 <div className="absolute right-6 top-full mt-1 z-10 bg-white rounded-xl shadow-xl border border-gray-100 py-1 w-40 text-sm" onClick={(e) => e.stopPropagation()}>
-                  <button onClick={() => handleJoinMethodChange(0)} className={`w-full px-4 py-2 text-left hover:bg-gray-50 ${needVerification === 0 ? "text-primary-500 font-medium" : "text-gray-600"}`}>无需审批入群</button>
-                  <button onClick={() => handleJoinMethodChange(1)} className={`w-full px-4 py-2 text-left hover:bg-gray-50 ${needVerification === 1 ? "text-primary-500 font-medium" : "text-gray-600"}`}>需要审批入群</button>
-                  <button onClick={() => handleJoinMethodChange(2)} className={`w-full px-4 py-2 text-left hover:bg-gray-50 ${needVerification === 2 ? "text-primary-500 font-medium" : "text-gray-600"}`}>禁止入群</button>
+                  <button onClick={() => handleJoinMethodChange(0)} className={`w-full px-4 py-2 text-left hover:bg-gray-50 ${needVerification === 0 ? "text-primary-500 font-medium" : "text-gray-600"}`}>申请需审批，邀请直接入群</button>
+                  <button onClick={() => handleJoinMethodChange(1)} className={`w-full px-4 py-2 text-left hover:bg-gray-50 ${needVerification === 1 ? "text-primary-500 font-medium" : "text-gray-600"}`}>申请和邀请均需审批</button>
+                  <button onClick={() => handleJoinMethodChange(2)} className={`w-full px-4 py-2 text-left hover:bg-gray-50 ${needVerification === 2 ? "text-primary-500 font-medium" : "text-gray-600"}`}>无需审批入群</button>
                 </div>
               )}
             </div>
