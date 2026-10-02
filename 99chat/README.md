@@ -28,6 +28,8 @@ npm run build
 
 启动本地前端和 OpenIM 后，执行 `TEST_VERIFY_CODE=<本地测试验证码> node password_reset_e2e.cjs`。测试只创建并重置独立的本地测试账号，覆盖错误验证码、密码校验、验证码重发倒计时和新旧密码登录结果；测试账号保留在本地。
 
+生产构建通过 `VITE_API_ADDR`、`VITE_WS_ADDR`、`VITE_CHAT_API` 指定 OpenIM HTTPS/WSS 地址。本地未配置时沿用 localhost。线上回归可设置 `E2E_BASE` 和 `E2E_CHAT_API`，使用独立测试账号，测试验证码仅通过环境变量传入。
+
 ## 手机网页布局
 
 宽度不超过 768px 时使用单屏列表/详情导航，底部“通讯录／聊天／我的”仅在根页面显示；详情沿用现有返回入口。超过 768px 保留桌面多栏，手机端 `/settings` 显示个人中心菜单，桌面默认进入个人资料。

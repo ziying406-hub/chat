@@ -10,9 +10,9 @@ import type {
   SdkEventDataMap,
 } from "@openim/wasm-client-sdk";
 
-const API_ADDR = "http://localhost:10002";
-const WS_ADDR = "ws://localhost:10001";
-const CHAT_API = "http://localhost:10008";
+const API_ADDR = import.meta.env.VITE_API_ADDR || "http://localhost:10002";
+const WS_ADDR = import.meta.env.VITE_WS_ADDR || "ws://localhost:10001";
+const CHAT_API = import.meta.env.VITE_CHAT_API || "http://localhost:10008";
 const PLATFORM_ID = 5;
 
 let sdk: ReturnType<typeof getSDK> | null = null;

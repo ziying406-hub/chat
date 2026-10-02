@@ -2,11 +2,11 @@ const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
 const { randomUUID } = require('node:crypto');
 
-// Only a new local fixture account is reset. Never targets a customer's account.
-const BASE = 'http://127.0.0.1:5199';
-const API = 'http://localhost:10008';
+// Only a new fixture account is reset. Never targets a customer's account.
+const BASE = process.env.E2E_BASE || 'http://127.0.0.1:5199';
+const API = process.env.E2E_CHAT_API || 'http://localhost:10008';
 const code = process.env.TEST_VERIFY_CODE;
-assert.ok(code, 'Set TEST_VERIFY_CODE to the local OpenIM test verification code');
+assert.ok(code, 'Set TEST_VERIFY_CODE to the OpenIM test verification code');
 async function request(path, body) {
   const response = await fetch(`${API}${path}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json', operationID: randomUUID() },
@@ -28,7 +28,7 @@ async function request(path, body) {
     page.on('request', req => {
       if (req.url().startsWith(API)) requests.push({ url: req.url(), body: req.postDataJSON() });
     });
-    await page.goto(`${BASE}/#/auth/sign-in`);
+    await page.goto(`${BASE}/?v=password-reset-c57fbea#/auth/sign-in`);
     await page.getByRole('link', { name: '忘记密码？' }).click();
     await page.getByRole('heading', { name: '重置密码', exact: true }).waitFor();
     assert.ok(page.url().endsWith('#/auth/forgot-password'), 'Forgot password must stay on its public route');
