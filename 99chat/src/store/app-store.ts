@@ -114,7 +114,7 @@ interface AppState {
   drafts: Record<string, string>;
 
   // Auth
-  sendCode: (phone: string, areaCode?: string) => Promise<void>;
+  sendCode: (phone: string, areaCode?: string, usedFor?: 1 | 2 | 3) => Promise<void>;
   register: (params: { phoneNumber: string; verifyCode: string; nickname: string; password: string; areaCode?: string }) => Promise<void>;
   login: (params: { phoneNumber: string; password: string; areaCode?: string }) => Promise<void>;
   restoreSession: () => Promise<void>;
@@ -347,10 +347,10 @@ export const useAppStore = create<AppState>()(
     tags: [],
     drafts: {},
 
-    sendCode: async (phone, areaCode = "+86") => {
+    sendCode: async (phone, areaCode = "+86", usedFor = 1) => {
       try {
         set((s) => { s.authError = null; });
-        await sendVerifyCode(phone, areaCode);
+        await sendVerifyCode(phone, areaCode, usedFor);
       } catch (e: any) {
         set((s) => { s.authError = e.message; });
         throw e;

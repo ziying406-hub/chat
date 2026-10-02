@@ -34,14 +34,29 @@ function genOperationID() {
 
 // ---------- Chat API ----------
 
-export async function sendVerifyCode(phoneNumber: string, areaCode = "+86"): Promise<void> {
+export async function sendVerifyCode(phoneNumber: string, areaCode = "+86", usedFor: 1 | 2 | 3 = 1): Promise<void> {
   const res = await fetch(`${CHAT_API}/account/code/send`, {
     method: "POST",
     headers: { "Content-Type": "application/json", operationID: genOperationID() },
-    body: JSON.stringify({ phoneNumber, areaCode, usedFor: 1 }),
+    body: JSON.stringify({ phoneNumber, areaCode, usedFor }),
   });
   const data = await res.json();
   if (data.errCode !== 0) throw new Error(data.errMsg || "发送验证码失败");
+}
+
+export async function resetPassword(params: {
+  phoneNumber: string;
+  areaCode: string;
+  verifyCode: string;
+  password: string;
+}): Promise<void> {
+  const res = await fetch(`${CHAT_API}/account/password/reset`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", operationID: genOperationID() },
+    body: JSON.stringify(params),
+  });
+  const data = await res.json();
+  if (data.errCode !== 0) throw new Error(data.errMsg || "重置密码失败");
 }
 
 export async function registerUser(params: {

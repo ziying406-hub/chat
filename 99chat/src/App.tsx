@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAppStore } from "./store/app-store";
 import Login from "./pages/Login";
+import ForgotPassword from "./pages/ForgotPassword";
 import AccountSwitch from "./pages/AccountSwitch";
 import InitialSetup from "./pages/InitialSetup";
 import Home from "./pages/Home";
@@ -103,6 +104,7 @@ export default function App() {
     <HashRouter>
       <Routes>
         <Route path="/auth/sign-in" element={<Login />} />
+        <Route path="/auth/forgot-password" element={<ForgotPassword />} />
         <Route path="/auth/switch" element={<AccountSwitch />} />
         <Route path="/auth/setup" element={<InitialSetup />} />
         <Route path="/home" element={<Home />} />
