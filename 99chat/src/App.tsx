@@ -25,6 +25,7 @@ export default function App() {
   const restoreSession = useAppStore((s) => s.restoreSession);
 
   const [pwaPrompt, setPwaPrompt] = useState<any>(null);
+  const [iosInstall, setIosInstall] = useState(false);
   const [showPwaBanner, setShowPwaBanner] = useState(false);
   const [showUpdateToast, setShowUpdateToast] = useState(false);
   const [showNotifDialog, setShowNotifDialog] = useState(false);
@@ -35,6 +36,12 @@ export default function App() {
 
   // PWA install prompt
   useEffect(() => {
+    const standalone = window.matchMedia("(display-mode: standalone)").matches || (navigator as Navigator & { standalone?: boolean }).standalone;
+    if (standalone) return;
+    if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
+      setIosInstall(true);
+      if (!localStorage.getItem("99chat_pwa_prompt_dismissed")) setShowPwaBanner(true);
+    }
     const handler = (e: Event) => {
       e.preventDefault();
       setPwaPrompt(e);
@@ -42,14 +49,23 @@ export default function App() {
         setShowPwaBanner(true);
       }
     };
+    const installed = () => { setPwaPrompt(null); setShowPwaBanner(false); };
     window.addEventListener("beforeinstallprompt", handler);
-    return () => window.removeEventListener("beforeinstallprompt", handler);
+    window.addEventListener("appinstalled", installed);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handler);
+      window.removeEventListener("appinstalled", installed);
+    };
   }, []);
 
   // PWA update detection
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
-    const controllerChange = () => setShowUpdateToast(true);
+    let previousController = navigator.serviceWorker.controller;
+    const controllerChange = () => {
+      if (previousController) setShowUpdateToast(true);
+      previousController = navigator.serviceWorker.controller;
+    };
     navigator.serviceWorker.addEventListener("controllerchange", controllerChange);
     return () => navigator.serviceWorker.removeEventListener("controllerchange", controllerChange);
   }, []);
@@ -121,10 +137,10 @@ export default function App() {
 
       {/* PWA install banner */}
       {showPwaBanner && (
-        <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-50 bg-white rounded-xl shadow-lg border border-gray-100 px-4 py-3 flex items-center gap-3 max-w-[90%]">
-          <span className="text-sm text-gray-700">将 99chat 添加到主屏幕，获得更好体验</span>
-          <button onClick={handleInstall} className="px-3 py-1.5 bg-primary-500 text-white rounded-lg text-sm hover:bg-primary-600 transition-colors">安装</button>
-          <button onClick={handleDismissPwa} className="px-3 py-1.5 bg-gray-100 text-gray-500 rounded-lg text-sm hover:bg-gray-200 transition-colors">稍后</button>
+        <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-50 bg-white rounded-xl shadow-lg border border-gray-100 px-4 py-3 flex items-center gap-3 w-[calc(100%-2rem)] max-w-md">
+          <span className="text-sm text-gray-700 flex-1">{iosInstall ? "在 Safari 中点“分享”，再选择“添加到主屏幕”。" : "将 99chat 添加到主屏幕，获得更好体验"}</span>
+          {!iosInstall && <button onClick={handleInstall} className="px-3 py-1.5 bg-primary-500 text-white rounded-lg text-sm hover:bg-primary-600 transition-colors">安装</button>}
+          <button onClick={handleDismissPwa} className="shrink-0 px-3 py-1.5 bg-gray-100 text-gray-500 rounded-lg text-sm hover:bg-gray-200 transition-colors">稍后</button>
         </div>
       )}
 

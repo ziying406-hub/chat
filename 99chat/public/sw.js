@@ -1,61 +1,55 @@
-const CACHE_NAME = "99chat-email-auth-v5";
+const CACHE_NAME = "99chat-pwa-v1";
 const CORE_ASSETS = [
-  "/",
-  "/index.html",
-  "/manifest.json",
-  "/wasm_exec.js",
-  "/openIM.wasm",
-  "/sql-wasm.wasm",
-  "/favicon.svg",
+  "/", "/manifest.json", "/wasm_exec.js", "/openIM.wasm", "/sql-wasm.wasm",
+  "/favicon.svg", "/app-icon.svg", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png",
 ];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(CORE_ASSETS)).then(() => self.skipWaiting())
-  );
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE_NAME);
+    await cache.addAll(CORE_ASSETS);
+    // The initial page loads before this worker controls it; cache its built JS/CSS too.
+    const html = await (await cache.match("/")).text();
+    const assets = [...html.matchAll(/(?:src|href)="(\/assets\/[^\"]+)"/g)].map(match => match[1]);
+    await cache.addAll(assets);
+    await self.skipWaiting();
+  })());
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
-    ).then(() => self.clients.claim())
-  );
+  event.waitUntil((async () => {
+    await Promise.all((await caches.keys()).filter(key => key.startsWith("99chat-") && key !== CACHE_NAME).map(key => caches.delete(key)));
+    await self.clients.claim();
+  })());
 });
 
 self.addEventListener("fetch", (event) => {
-  const { request } = event;
+  const request = event.request;
   const url = new URL(request.url);
-
-  // Network-first for API calls
-  if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/account/")) {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          if (response && response.status === 200) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-          }
-          return response;
-        })
-        .catch(() => caches.match(request))
-    );
+  if (request.method !== "GET" || url.origin !== self.location.origin || /^\/(chat|im|api|account|user)(\/|$)/.test(url.pathname)) return;
+  const navigation = request.mode === "navigate";
+  const config = url.pathname === "/manifest.json" || url.pathname === "/firebase-config.js";
+  if (navigation || config) {
+    event.respondWith((async () => {
+      const cache = await caches.open(CACHE_NAME);
+      const key = navigation ? "/" : request;
+      try {
+        const response = await fetch(request, { cache: "no-cache" });
+        if (response.ok) await cache.put(key, response.clone());
+        return response;
+      } catch {
+        return (await cache.match(key)) || Response.error();
+      }
+    })());
     return;
   }
-
-  // Cache-first for static assets
-  if (request.method === "GET") {
-    event.respondWith(
-      caches.match(request).then((cached) => {
-        if (cached) return cached;
-        return fetch(request).then((response) => {
-          if (response && response.status === 200 && response.type === "basic") {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-          }
-          return response;
-        });
-      })
-    );
-  }
+  if (!/\.(js|css|wasm|png|svg|woff2?)$/.test(url.pathname)) return;
+  event.respondWith((async () => {
+    const cache = await caches.open(CACHE_NAME);
+    const cached = await cache.match(request);
+    if (cached) return cached;
+    const response = await fetch(request);
+    if (response.ok) await cache.put(request, response.clone());
+    return response;
+  })());
 });
