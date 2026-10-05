@@ -3,7 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { MessageCircle, Eye, EyeOff, Phone, Lock, User, ShieldCheck, Loader2, ChevronDown } from "lucide-react";
 import { useAppStore } from "../store/app-store";
 
-type Tab = "login" | "register" | "verify";
+type Tab = "login" | "register";
 
 const AREA_CODES = [
   { code: "+86", label: "+86 中国" },
@@ -64,19 +64,11 @@ export default function Login() {
       navigate("/messages", { replace: true });
     } catch {}
   };
-  const handleVerifyLogin = async () => {
-    if (!validEmail()) return;
-    if (!code.trim()) { setAuthError("请输入邮箱验证码"); return; }
-    try {
-      await login({ email: email.trim(), verifyCode: code.trim() });
-      navigate("/messages", { replace: true });
-    } catch {}
-  };
   const handleSendCode = async () => {
     if (sendingCode || countdown || !validEmail()) return;
     setSendingCode(true);
     try {
-      await sendCode(email.trim(), undefined, tab === "verify" ? 3 : 1);
+      await sendCode(email.trim(), undefined, 1);
       setCountdown(60);
     } catch {}
     setSendingCode(false);
@@ -84,8 +76,7 @@ export default function Login() {
 
   const handleSubmit = () => {
     if (tab === "login") handleLogin();
-    else if (tab === "register") handleRegister();
-    else handleVerifyLogin();
+    else handleRegister();
   };
 
   return (
@@ -105,10 +96,6 @@ export default function Login() {
             onClick={() => { setTab("login"); setAuthError(null); }}
             className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${tab === "login" ? "bg-white text-primary-600 shadow-sm" : "text-gray-400"}`}
           >密码登录</button>
-          <button
-            onClick={() => { setTab("verify"); setCode(""); setAuthError(null); }}
-            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${tab === "verify" ? "bg-white text-primary-600 shadow-sm" : "text-gray-400"}`}
-          >验证码登录</button>
           <button
             onClick={() => { setTab("register"); setCode(""); setAuthError(null); }}
             className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${tab === "register" ? "bg-white text-primary-600 shadow-sm" : "text-gray-400"}`}
@@ -184,7 +171,7 @@ export default function Login() {
 
           )}
 
-          {(tab === "register" || tab === "verify") && (
+          {tab === "register" && (
             <div>
               <label className="text-sm text-gray-500 mb-1 block">验证码</label>
               <div className="flex gap-2">
@@ -208,28 +195,26 @@ export default function Login() {
             </div>
           )}
 
-          {tab !== "verify" && (
-            <div>
-              <label className="text-sm text-gray-500 mb-1 block">密码</label>
-              <div className="relative">
-                <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" />
-                <input
-                  type={showPwd ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  onKeyDown={(e) => tab === "login" && e.key === "Enter" && handleSubmit()}
-                  className="w-full pl-10 pr-10 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:border-primary-500 transition-colors"
-                  placeholder="请输入密码"
-                />
-                <button
-                  onClick={() => setShowPwd(!showPwd)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  {showPwd ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
+          <div>
+            <label className="text-sm text-gray-500 mb-1 block">密码</label>
+            <div className="relative">
+              <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" />
+              <input
+                type={showPwd ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={(e) => tab === "login" && e.key === "Enter" && handleSubmit()}
+                className="w-full pl-10 pr-10 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:border-primary-500 transition-colors"
+                placeholder="请输入密码"
+              />
+              <button
+                onClick={() => setShowPwd(!showPwd)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                {showPwd ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
             </div>
-          )}
+          </div>
 
           {tab === "register" && <div>
             <label className="text-sm text-gray-500 mb-1 block">确认密码</label>
@@ -243,7 +228,7 @@ export default function Login() {
             className="w-full py-2.5 bg-primary-500 text-white rounded-xl font-medium hover:bg-primary-600 transition-colors shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {isLoggingIn && <Loader2 size={16} className="animate-spin" />}
-            {isLoggingIn ? "处理中..." : tab === "login" ? "登录" : tab === "verify" ? "登录" : "注册"}
+            {isLoggingIn ? "处理中..." : tab === "login" ? "登录" : "注册"}
           </button>
 
           {tab === "login" && (

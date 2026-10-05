@@ -18,6 +18,7 @@ async function request(path, body, token = '') {
     await page.goto(`${BASE}/#/auth/sign-in`);
     assert.equal(await page.getByRole('button', { name: '旧账号手机号登录', exact: true }).count(), 0);
     assert.equal(await page.getByPlaceholder('请输入手机号').count(), 0);
+    assert.equal(await page.getByRole('button', { name: '验证码登录', exact: true }).count(), 0);
     await page.getByPlaceholder('请输入邮箱', { exact: true }).waitFor();
     await page.getByRole('button', { name: '注册', exact: true }).first().click();
     await page.getByPlaceholder('请输入昵称').fill('email-auth-qa');
@@ -47,15 +48,14 @@ async function request(path, body, token = '') {
     await page.evaluate(() => localStorage.clear()); await page.goto(`${BASE}/#/auth/sign-in`); await page.reload();
     const requests = [];
     page.on('request', req => { if (req.url().endsWith('/account/code/send')) requests.push(req.postDataJSON()); });
-    await page.getByRole('button', { name: '验证码登录', exact: true }).click();
     await page.getByPlaceholder('请输入邮箱', { exact: true }).fill(email);
-    await page.getByRole('button', { name: '获取验证码', exact: true }).click();
-    await page.getByRole('button', { name: /秒后重发/ }).waitFor(); assert.equal(requests.at(-1).usedFor, 3);
-    await page.getByPlaceholder('请输入邮箱验证码').fill(code);
-    const otp = page.waitForResponse(res => res.url().endsWith('/account/login'));
+    await page.getByPlaceholder('请输入密码', { exact: true }).fill(password);
+    const passwordLogin = page.waitForResponse(res => res.url().endsWith('/account/login'));
     await page.getByRole('button', { name: '登录', exact: true }).click();
-    const otpLogin = await (await otp).json(); assert.equal(otpLogin.errCode, 0, otpLogin.errMsg); assert.equal(otpLogin.data.userID, uid);
-    assert.equal(requests.length, 1); await page.waitForURL('**/#/messages');
+    const loginData = await (await passwordLogin).json();
+    assert.equal(loginData.errCode, 0, loginData.errMsg); assert.equal(loginData.data.userID, uid);
+    assert.equal(requests.length, 0, 'Password login must not send a verification code');
+    await page.waitForURL('**/#/messages');
     await page.close();
     page = await browser.newPage({ viewport: { width: 390, height: 844 } });
     page.on('request', req => { if (req.url().endsWith('/account/code/send')) requests.push(req.postDataJSON()); });
@@ -101,6 +101,6 @@ async function request(path, body, token = '') {
     assert.equal((await request('/account/login', { phoneNumber, areaCode: '+86', password, platform: 5 })).errCode, 0);
     assert.equal((await request('/account/password/change', { userID: legacy.data.userID, currentPassword: password, newPassword }, lt)).errCode, 0);
     assert.equal((await request('/account/login', { email: boundEmail, password: newPassword, platform: 5 })).errCode, 0);
-    console.log('PASS email registration, durable contact, password/OTP login, recovery, verified legacy binding, authenticated password change');
+    console.log('PASS email registration, durable contact, password login, recovery, verified legacy binding, authenticated password change');
   } catch (error) { console.error(await page.locator("body").innerText()); await page.screenshot({ path: "/tmp/99chat-email-test-error.png" }); throw error; } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exit(1); });

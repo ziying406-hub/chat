@@ -18,7 +18,7 @@ async function request(path, body, token = '') {
     page.setDefaultTimeout(45000);
     await page.goto(`${BASE}/?v=email-auth-e360268#/auth/sign-in`);
     await page.evaluate(() => navigator.serviceWorker.ready);
-    await page.waitForFunction(async () => (await caches.keys()).includes('99chat-email-auth-v4'));
+    await page.waitForFunction(async () => (await caches.keys()).includes('99chat-email-auth-v5'));
     await page.getByRole('button', { name: '注册', exact: true }).first().click();
     await page.getByPlaceholder('请输入昵称').fill('email-live-qa');
     await page.getByPlaceholder('请输入邮箱', { exact: true }).fill(email);
