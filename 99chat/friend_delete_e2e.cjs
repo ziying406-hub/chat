@@ -93,7 +93,14 @@ async function history(page, peer) {
     const warm = `friend-delete-before-${randomUUID()}`;
     assert.equal((await send(pb, a.userID, warm)).errCode, 0);
     await waitFor(async () => (await history(pa, b.userID)).some(msg => msg.textElem?.content === warm));
-    assert.equal((await call(pa, 'deleteFriend', b.userID)).errCode, 0);
+    const ui = await (await browser.newContext()).newPage();
+    await ui.addInitScript(auth => localStorage.setItem('99chat_session', JSON.stringify(auth)), a);
+    await ui.goto(`${BASE}/#/contact/user/${b.userID}`);
+    await ui.getByRole('button', { name: '删除好友', exact: true }).click({ timeout: 60000 });
+    await ui.getByText(/删除后对方不能再给你发送私聊消息/).waitFor();
+    await ui.getByRole('button', { name: '删除', exact: true }).click();
+    await ui.waitForURL(/#\/contact$/, { timeout: 30000 });
+    await ui.close();
     await waitFor(async () => !(await call(pa, 'getFriendList', false)).data.some(friend => friend.userID === b.userID));
     assert.ok((await call(pb, 'getFriendList', false)).data.some(friend => friend.userID === a.userID), 'Deletion stays one-way');
     const blocked = `friend-delete-blocked-${randomUUID()}`;
