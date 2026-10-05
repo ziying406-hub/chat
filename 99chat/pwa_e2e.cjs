@@ -27,6 +27,7 @@ const BASE = process.env.E2E_BASE || 'http://127.0.0.1:5200';
   await page.evaluate(() => navigator.serviceWorker.ready);
   await page.waitForFunction(() => !!navigator.serviceWorker.controller);
   assert.equal(await page.getByText('新版本可用，点击刷新', { exact: true }).count(), 0, 'First installation must not look like an update');
+  assert.equal(await page.evaluate(async () => !!(await (await caches.open('99chat-pwa-v1')).match('/firebase-config.js'))), true, 'Bootstrap config must be cached on first installation');
   await page.evaluate(async () => {
    const cache = await caches.open('99chat-pwa-v1');
    await cache.put('/', new Response('<html><body>STALE_SHELL</body></html>', { headers: { 'Content-Type': 'text/html' } }));
@@ -40,6 +41,11 @@ const BASE = process.env.E2E_BASE || 'http://127.0.0.1:5200';
   assert.ok(cached.every(req => req.method === 'GET' && new URL(req.url).origin === new URL(BASE).origin));
   assert.ok(cached.every(req => !/^\/(chat|im|api|account|user)(\/|$)/.test(new URL(req.url).pathname)));
   await context.setOffline(true);
+  const config = await page.evaluate(async () => {
+   const response = await fetch('/firebase-config.js');
+   return { ok: response.ok, body: await response.text() };
+  });
+  assert.equal(config.ok, true); assert.match(config.body, /CHAT_FIREBASE/);
   await page.reload();
   await page.getByRole('heading', { name: '99chat', exact: true }).waitFor();
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);

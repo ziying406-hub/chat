@@ -1,6 +1,6 @@
 const CACHE_NAME = "99chat-pwa-v1";
 const CORE_ASSETS = [
-  "/", "/manifest.json", "/wasm_exec.js", "/openIM.wasm", "/sql-wasm.wasm",
+  "/", "/manifest.json", "/firebase-config.js", "/wasm_exec.js", "/openIM.wasm", "/sql-wasm.wasm",
   "/favicon.svg", "/app-icon.svg", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png",
 ];
 
