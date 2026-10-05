@@ -18,7 +18,7 @@
 E2E_CHAT_API=https://999.99chat99.com/chat TEST_EMAIL=<授权的测试邮箱> node 99chat/email_verify_smoke.cjs
 ```
 
-本次完成邮件通道配置和发信验证，登录、注册、找回密码页面尚未改为邮箱输入；手机号可选资料及已有账号绑定邮箱也尚未实现。启用邮件通道后，原生验证码校验使用真实邮件验证码，固定测试码不再作为绕过方式；手机号短信通道仍未启用。
+用户随后确认已收到原生验证码。邮箱注册、登录、找回密码、选填手机号数据库保存和旧账号绑定邮箱均已完成并上线，详见 email-auth-deployment-2026-10-05.md。启用邮件通道后，原生验证码校验使用真实邮件验证码，固定测试码不再作为绕过方式；手机号短信通道仍未启用。
 
 回滚配置备份位于 `/opt/openim/backups/mail-20261005`。将其中的 `docker-compose-custom.yml` 恢复到 `/opt/openim/docker-compose-custom.yml`，在 `/opt/openim` 执行以下命令可撤销新增邮件配置挂载：
 

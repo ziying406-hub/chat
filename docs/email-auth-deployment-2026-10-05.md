@@ -15,4 +15,10 @@ user/email/bind 先验证邮箱验证码，再为 token 对应的当前用户绑
 - TEST_VERIFY_CODE=666666 node email_auth_e2e.cjs 通过真实 API/SDK：邮箱注册、选填 +60 电话数据库保存及跨会话读取、拒绝资料电话登录、拒绝无 token 写资料、密码及验证码登录、错误验证码拒绝重置、重置后旧密码失效且用户 ID 不变、旧手机号登录与页面绑定邮箱、拒绝未验证邮箱更新、认证修改密码。
 - 本地测试验证码仅用于关闭真实发信的独立测试环境，生产仍使用真实邮箱验证码。
 
-生产发布记录在部署及线上验证完成后补充。SMTP 密码与邮箱验证码不进入 Git 或前端产物。
+生产发布完成：功能提交 e360268，缓存更新提交 353aa66；Chat 镜像 99chat/openim-chat:email-e360268，前端资源 index-BjoEBrjt.js / index-GySbuskm.css。服务工作线程缓存版本为 99chat-email-auth-v3，已有客户端可收到更新。Nginx 配置校验通过，Chat 与 IM Server 均 healthy。
+
+email_auth_live_smoke.cjs 在线上用同一授权 Gmail 的独立 +99chatqa 别名通过：真实 SMTP 验证码 → 页面注册 → IM SDK 登录 → +60 选填手机号数据库保存及跨会话读取 → 拒绝资料手机号登录 → 邮箱密码与真实验证码登录 → 错误验证码拒绝重置 → 邮箱密码重置后旧密码失效、新密码登录同一用户 ID。验证码由私有测试读取器取得，既不输出也不写入代码。测试账号保留，没有修改客户账号或发送聊天消息。
+
+配置备份目录 /opt/openim/backups/email-auth-20261005；旧镜像 99chat/openim-chat:before-email-e360268、chat-project-web:before-email-e360268。回滚时恢复该目录中的 docker-compose-custom.yml，并将旧 Web 镜像重新标记为 chat-project-web，再分别用现有 Compose 文件仅重建 openim-chat 与 web；无需删除数据库或数据卷。
+
+SMTP 密码与邮箱验证码不进入 Git 或前端产物。
