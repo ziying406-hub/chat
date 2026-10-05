@@ -1,0 +1,143 @@
+diff --git a/internal/api/chat/chat.go b/internal/api/chat/chat.go
+index fd96d04..b4b1d1e 100644
+--- a/internal/api/chat/chat.go
++++ b/internal/api/chat/chat.go
+@@ -44,6 +44,7 @@ func New(chatClient chatpb.ChatClient, adminClient admin.AdminClient, imApiCalle
+ 		adminClient: adminClient,
+ 		imApiCaller: imApiCaller,
+ 		favorites:   database.Collection("99chat_favorites"),
++		contacts:    database.Collection("99chat_contact_profiles"),
+ 	}
+ }
+ 
+@@ -53,6 +54,7 @@ type Api struct {
+ 	adminClient admin.AdminClient
+ 	imApiCaller imapi.CallerInterface
+ 	favorites   *mongo.Collection
++	contacts    *mongo.Collection
+ }
+ 
+ type favorite struct {
+@@ -298,6 +300,10 @@ func (o *Api) UpdateUserInfo(c *gin.Context) {
+ 		apiresp.GinError(c, err)
+ 		return
+ 	}
++	if req.Email != nil {
++		apiresp.GinError(c, errs.ErrArgs.WrapMsg("Use /user/email/bind with an email verification code"))
++		return
++	}
+ 	respUpdate, err := o.chatClient.UpdateUserInfo(c, req)
+ 	if err != nil {
+ 		apiresp.GinError(c, err)
+diff --git a/internal/api/chat/contact.go b/internal/api/chat/contact.go
+new file mode 100644
+index 0000000..0d5d5bc
+--- /dev/null
++++ b/internal/api/chat/contact.go
+@@ -0,0 +1,92 @@
++package chat
++
++import (
++	"errors"
++	"net/mail"
++	"regexp"
++	"strings"
++
++	"github.com/gin-gonic/gin"
++	"github.com/openimsdk/chat/pkg/common/mctx"
++	chatpb "github.com/openimsdk/chat/pkg/protocol/chat"
++	"github.com/openimsdk/protocol/wrapperspb"
++	"github.com/openimsdk/tools/apiresp"
++	"github.com/openimsdk/tools/errs"
++	"go.mongodb.org/mongo-driver/bson"
++	"go.mongodb.org/mongo-driver/mongo"
++	"go.mongodb.org/mongo-driver/mongo/options"
++)
++
++// Contact phone numbers are profile data, not OpenIM login credentials.
++type contactProfile struct {
++	PhoneNumber string `bson:"phoneNumber" json:"phoneNumber"`
++	AreaCode    string `bson:"areaCode" json:"areaCode"`
++	Email       string `bson:"-" json:"email"`
++}
++
++var phonePattern = regexp.MustCompile(`^[0-9]{5,15}$`)
++var areaPattern = regexp.MustCompile(`^\+[0-9]{1,4}$`)
++
++func (o *Api) GetContact(c *gin.Context) {
++	userID := mctx.GetOpUserID(c)
++	resp, err := o.chatClient.FindUserFullInfo(c, &chatpb.FindUserFullInfoReq{UserIDs: []string{userID}})
++	if err != nil {
++		apiresp.GinError(c, err)
++		return
++	}
++	var profile contactProfile
++	err = o.contacts.FindOne(c, bson.M{"_id": userID}).Decode(&profile)
++	if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
++		apiresp.GinError(c, err)
++		return
++	}
++	if len(resp.Users) > 0 {
++		profile.Email = resp.Users[0].Email
++		if errors.Is(err, mongo.ErrNoDocuments) {
++			profile.PhoneNumber = resp.Users[0].PhoneNumber
++			profile.AreaCode = resp.Users[0].AreaCode
++		}
++	}
++	apiresp.GinSuccess(c, profile)
++}
++
++func (o *Api) SaveContact(c *gin.Context) {
++	var profile contactProfile
++	if err := c.ShouldBindJSON(&profile); err != nil || !areaPattern.MatchString(profile.AreaCode) || (profile.PhoneNumber != "" && !phonePattern.MatchString(profile.PhoneNumber)) {
++		apiresp.GinError(c, errs.ErrArgs.WrapMsg("Invalid phone number or area code"))
++		return
++	}
++	_, err := o.contacts.UpdateOne(c, bson.M{"_id": mctx.GetOpUserID(c)}, bson.M{"$set": profile}, options.Update().SetUpsert(true))
++	if err != nil {
++		apiresp.GinError(c, err)
++		return
++	}
++	apiresp.GinSuccess(c, nil)
++}
++
++func (o *Api) BindEmail(c *gin.Context) {
++	var req struct {
++		Email      string `json:"email"`
++		VerifyCode string `json:"verifyCode"`
++	}
++	if err := c.ShouldBindJSON(&req); err != nil {
++		apiresp.GinError(c, errs.ErrArgs)
++		return
++	}
++	req.Email = strings.TrimSpace(req.Email)
++	address, err := mail.ParseAddress(req.Email)
++	if err != nil || address.Address != req.Email || req.VerifyCode == "" {
++		apiresp.GinError(c, errs.ErrArgs.WrapMsg("Invalid email or code"))
++		return
++	}
++	if _, err = o.chatClient.VerifyCode(c, &chatpb.VerifyCodeReq{Email: req.Email, VerifyCode: req.VerifyCode}); err != nil {
++		apiresp.GinError(c, err)
++		return
++	}
++	_, err = o.chatClient.UpdateUserInfo(c, &chatpb.UpdateUserInfoReq{UserID: mctx.GetOpUserID(c), Email: &wrapperspb.StringValue{Value: req.Email}})
++	if err != nil {
++		apiresp.GinError(c, err)
++		return
++	}
++	apiresp.GinSuccess(c, nil)
++}
+diff --git a/internal/api/chat/start.go b/internal/api/chat/start.go
+index 02519b5..3e3f995 100644
+--- a/internal/api/chat/start.go
++++ b/internal/api/chat/start.go
+@@ -156,6 +156,9 @@ func SetChatRoute(router gin.IRouter, chat *Api, mw *chatmw.MW) {
+ 	user.POST("/search/full", chat.SearchUserFullInfo)        // Search user's public information
+ 	user.POST("/search/public", chat.SearchUserPublicInfo)    // Search all information of the user
+ 	user.POST("/rtc/get_token", chat.GetTokenForVideoMeeting) // Get token for video meeting for the user
++	user.POST("/contact/get", chat.GetContact)
++	user.POST("/contact/save", chat.SaveContact)
++	user.POST("/email/bind", chat.BindEmail)
+ 	user.POST("/favorites/list", chat.ListFavorites)
+ 	user.POST("/favorites/save", chat.SaveFavorite)
+ 	user.POST("/favorites/delete", chat.DeleteFavorite)

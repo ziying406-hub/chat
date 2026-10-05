@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { MessageCircle, Eye, EyeOff, Phone, Lock, User, ShieldCheck, Loader2, ChevronDown } from "lucide-react";
 import { useAppStore } from "../store/app-store";
@@ -24,49 +24,61 @@ export default function Login() {
   const setAuthError = useAppStore((s) => s.setAuthError);
 
   const [tab, setTab] = useState<Tab>("login");
+  const [email, setEmail] = useState("");
+  const [phoneLogin, setPhoneLogin] = useState(false);
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [nickname, setNickname] = useState("");
   const [code, setCode] = useState("");
   const [showPwd, setShowPwd] = useState(false);
-  const [codeSent, setCodeSent] = useState(false);
+  const [countdown, setCountdown] = useState(0);
   const [sendingCode, setSendingCode] = useState(false);
   const [areaCode, setAreaCode] = useState("+86");
   const [areaOpen, setAreaOpen] = useState(false);
 
+  useEffect(() => {
+    if (!countdown) return;
+    const timer = window.setTimeout(() => setCountdown(countdown - 1), 1000);
+    return () => window.clearTimeout(timer);
+  }, [countdown]);
+  const validEmail = () => {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { setAuthError("请输入有效邮箱"); return false; }
+    return true;
+  };
   const handleLogin = async () => {
-    if (!phone.trim() || !password.trim()) return;
+    if (phoneLogin ? !phone.trim() : !validEmail()) return;
+    if (!password) { setAuthError("请输入密码"); return; }
     try {
-      await login({ phoneNumber: phone.trim(), password, areaCode });
+      await login({ ...(phoneLogin ? { phoneNumber: phone.trim(), areaCode } : { email: email.trim() }), password });
       navigate("/messages", { replace: true });
     } catch {}
   };
-
   const handleRegister = async () => {
-    if (!phone.trim() || !password.trim() || !nickname.trim() || !code.trim()) return;
+    if (!validEmail()) return;
+    if (!nickname.trim() || !code.trim()) { setAuthError("请输入昵称和邮箱验证码"); return; }
+    if (password.length < 6) { setAuthError("密码至少 6 位"); return; }
+    if (password !== confirmPassword) { setAuthError("两次输入的密码不一致"); return; }
+    if (phone.trim() && !/^[0-9]{5,15}$/.test(phone.trim())) { setAuthError("请输入有效手机号"); return; }
     try {
-      await register({ phoneNumber: phone.trim(), verifyCode: code.trim(), nickname, password, areaCode });
-      const user = useAppStore.getState().currentUser;
-      navigate(user?.nickname ? "/messages" : "/auth/setup", { replace: true });
+      await register({ email: email.trim(), phoneNumber: phone.trim(), verifyCode: code.trim(), nickname: nickname.trim(), password, areaCode });
+      navigate("/messages", { replace: true });
     } catch {}
   };
-
   const handleVerifyLogin = async () => {
-    if (!phone.trim() || !code.trim()) return;
+    if (!validEmail()) return;
+    if (!code.trim()) { setAuthError("请输入邮箱验证码"); return; }
     try {
-      await sendCode(phone.trim(), areaCode);
-      await register({ phoneNumber: phone.trim(), verifyCode: code.trim(), nickname: phone.trim(), password: code.trim(), areaCode });
-      const user = useAppStore.getState().currentUser;
-      navigate(user?.nickname ? "/messages" : "/auth/setup", { replace: true });
+      await login({ email: email.trim(), verifyCode: code.trim() });
+      navigate("/messages", { replace: true });
     } catch {}
   };
-
   const handleSendCode = async () => {
-    if (!phone.trim()) return;
+    if (sendingCode || countdown || !validEmail()) return;
     setSendingCode(true);
     try {
-      await sendCode(phone.trim(), areaCode);
-      setCodeSent(true);
+      await sendCode(email.trim(), undefined, tab === "verify" ? 3 : 1);
+      setCountdown(60);
     } catch {}
     setSendingCode(false);
   };
@@ -79,7 +91,7 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-500 to-primary-700">
-      <div className="w-[400px] bg-white rounded-2xl shadow-2xl p-8">
+      <div className="w-[400px] max-w-[calc(100%-2rem)] bg-white rounded-2xl shadow-2xl p-8">
         <div className="flex flex-col items-center mb-6">
           <div className="w-16 h-16 bg-primary-500 rounded-2xl flex items-center justify-center text-white mb-3 shadow-lg">
             <MessageCircle size={32} />
@@ -95,17 +107,17 @@ export default function Login() {
             className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${tab === "login" ? "bg-white text-primary-600 shadow-sm" : "text-gray-400"}`}
           >密码登录</button>
           <button
-            onClick={() => { setTab("verify"); setAuthError(null); }}
+            onClick={() => { setTab("verify"); setCode(""); setPhoneLogin(false); setAuthError(null); }}
             className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${tab === "verify" ? "bg-white text-primary-600 shadow-sm" : "text-gray-400"}`}
           >验证码登录</button>
           <button
-            onClick={() => { setTab("register"); setAuthError(null); }}
+            onClick={() => { setTab("register"); setCode(""); setPhoneLogin(false); setAuthError(null); }}
             className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${tab === "register" ? "bg-white text-primary-600 shadow-sm" : "text-gray-400"}`}
           >注册</button>
         </div>
 
         {authError && (
-          <div className="mb-4 px-3 py-2 bg-red-50 text-red-500 text-sm rounded-lg">{authError}</div>
+          <div role="alert" className="mb-4 px-3 py-2 bg-red-50 text-red-500 text-sm rounded-lg">{authError}</div>
         )}
 
         <div className="space-y-4">
@@ -124,8 +136,14 @@ export default function Login() {
             </div>
           )}
 
+          {tab === "login" && <button onClick={() => { setPhoneLogin(!phoneLogin); setAuthError(null); }} className="text-sm text-primary-500">{phoneLogin ? "切换邮箱登录" : "旧账号手机号登录"}</button>}
+          {(!phoneLogin || tab !== "login") && <div>
+            <label className="text-sm text-gray-500 mb-1 block">邮箱</label>
+            <input type="email" value={email} onChange={(e) => { setEmail(e.target.value); setCode(""); }} autoComplete="email" placeholder="请输入邮箱" className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:border-primary-500" />
+          </div>}
+          {(tab === "register" || (tab === "login" && phoneLogin)) && (
           <div>
-            <label className="text-sm text-gray-500 mb-1 block">手机号</label>
+            <label className="text-sm text-gray-500 mb-1 block">{tab === "register" ? "手机号（选填）" : "手机号"}</label>
             <div className="flex gap-2">
               {/* Area code selector */}
               <div className="relative">
@@ -166,6 +184,8 @@ export default function Login() {
             </div>
           </div>
 
+          )}
+
           {(tab === "register" || tab === "verify") && (
             <div>
               <label className="text-sm text-gray-500 mb-1 block">验证码</label>
@@ -176,15 +196,15 @@ export default function Login() {
                     value={code}
                     onChange={(e) => setCode(e.target.value)}
                     className="w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:border-primary-500 transition-colors"
-                    placeholder="验证码 (666666)"
+                    placeholder="请输入邮箱验证码"
                   />
                 </div>
                 <button
                   onClick={handleSendCode}
-                  disabled={sendingCode || codeSent}
+                  disabled={sendingCode || countdown > 0}
                   className="px-4 py-2.5 text-sm border border-primary-200 text-primary-500 rounded-xl hover:bg-primary-50 transition-colors disabled:opacity-50 whitespace-nowrap"
                 >
-                  {sendingCode ? "发送中..." : codeSent ? "已发送" : "获取验证码"}
+                  {sendingCode ? "发送中..." : countdown > 0 ? `${countdown} 秒后重发` : "获取验证码"}
                 </button>
               </div>
             </div>
@@ -212,6 +232,12 @@ export default function Login() {
               </div>
             </div>
           )}
+
+          {tab === "register" && <div>
+            <label className="text-sm text-gray-500 mb-1 block">确认密码</label>
+            <input type={showPwd ? "text" : "password"} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="请再次输入密码" className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:border-primary-500" />
+            <p className="text-xs text-gray-400 mt-2">邮箱用于验证和找回密码，手机号仅保存为选填资料。</p>
+          </div>}
 
           <button
             onClick={handleSubmit}

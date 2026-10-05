@@ -16,7 +16,7 @@ async function request(path, body) {
 }
 
 (async () => {
-  const phoneNumber = `139${String(Date.now()).slice(-8)}`;
+  const email = `reset-${Date.now()}@example.com`;
   const password = randomUUID();
   const newPassword = randomUUID();
   const browser = await chromium.launch({ headless: true });
@@ -37,10 +37,10 @@ async function request(path, body) {
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true, 'Recovery form must fit a phone viewport');
     const registration = await request('/account/register', {
       verifyCode: code, platform: 5, autoLogin: true,
-      user: { areaCode: '+86', phoneNumber, password, nickname: 'password-reset-qa' },
+      user: { email, password, nickname: 'password-reset-qa' },
     });
     assert.equal(registration.errCode, 0, registration.errMsg);
-    await page.getByPlaceholder('请输入手机号').fill(phoneNumber);
+    await page.getByPlaceholder('请输入邮箱').fill(email);
     const sent = page.waitForResponse(res => res.url().endsWith('/account/code/send'));
     await page.getByRole('button', { name: '获取验证码', exact: true }).click();
     assert.equal((await (await sent).json()).errCode, 0, 'Reset code must be sent for an existing account');
@@ -65,7 +65,7 @@ async function request(path, body) {
     await page.getByRole('button', { name: '重置密码', exact: true }).click();
     assert.notEqual((await (await rejected).json()).errCode, 0, 'Invalid code must fail');
     await page.getByRole('alert').waitFor();
-    const unchanged = await request('/account/login', { areaCode: '+86', phoneNumber, password, platform: 5 });
+    const unchanged = await request('/account/login', { email, password, platform: 5 });
     assert.equal(unchanged.errCode, 0, 'Rejected reset must preserve the old password');
     await page.getByPlaceholder('请输入验证码').fill(code);
     const reset = page.waitForResponse(res => res.url().endsWith('/account/password/reset'));
@@ -74,9 +74,9 @@ async function request(path, body) {
     await page.getByText('密码重置成功，请使用新密码登录', { exact: true }).waitFor();
     assert.equal(requests.filter(req => req.url.endsWith('/account/code/send')).length, 1, 'Submitting must not resend or invalidate the code');
     assert.equal(requests.filter(req => req.url.endsWith('/account/register')).length, 0, 'Reset must never register an account');
-    const oldLogin = await request('/account/login', { areaCode: '+86', phoneNumber, password, platform: 5 });
+    const oldLogin = await request('/account/login', { email, password, platform: 5 });
     assert.notEqual(oldLogin.errCode, 0, 'Old password must stop working');
-    const newLogin = await request('/account/login', { areaCode: '+86', phoneNumber, password: newPassword, platform: 5 });
+    const newLogin = await request('/account/login', { email, password: newPassword, platform: 5 });
     assert.equal(newLogin.errCode, 0, newLogin.errMsg);
     assert.equal(newLogin.data.userID, registration.data.userID, 'Reset must preserve the original account');
     await page.getByRole('button', { name: '返回登录', exact: true }).click();

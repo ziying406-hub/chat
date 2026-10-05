@@ -38,15 +38,16 @@ export async function sendVerifyCode(phoneNumber: string, areaCode = "+86", used
   const res = await fetch(`${CHAT_API}/account/code/send`, {
     method: "POST",
     headers: { "Content-Type": "application/json", operationID: genOperationID() },
-    body: JSON.stringify({ phoneNumber, areaCode, usedFor }),
+    body: JSON.stringify({ ...(phoneNumber.includes("@") ? { email: phoneNumber } : { phoneNumber, areaCode }), usedFor }),
   });
   const data = await res.json();
   if (data.errCode !== 0) throw new Error(data.errMsg || "发送验证码失败");
 }
 
 export async function resetPassword(params: {
-  phoneNumber: string;
-  areaCode: string;
+  email?: string;
+  phoneNumber?: string;
+  areaCode?: string;
   verifyCode: string;
   password: string;
 }): Promise<void> {
@@ -60,7 +61,8 @@ export async function resetPassword(params: {
 }
 
 export async function registerUser(params: {
-  phoneNumber: string;
+  email?: string;
+  phoneNumber?: string;
   areaCode?: string;
   verifyCode: string;
   nickname: string;
@@ -75,29 +77,37 @@ export async function registerUser(params: {
       autoLogin: true,
       user: {
         nickname: params.nickname,
-        areaCode: params.areaCode || "+86",
-        phoneNumber: params.phoneNumber,
+        ...(params.email ? { email: params.email } : { areaCode: params.areaCode || "+86", phoneNumber: params.phoneNumber }),
         password: params.password,
       },
     }),
   });
   const data = await res.json();
   if (data.errCode !== 0) throw new Error(data.errMsg || "注册失败");
+  if (params.email && params.phoneNumber) {
+    try {
+      await saveContactProfile(data.data.chatToken, { phoneNumber: params.phoneNumber, areaCode: params.areaCode || "+86" });
+    } catch {
+      throw new Error("账号已创建，但手机号保存失败。请用邮箱登录后在个人资料中重试。");
+    }
+  }
   return data.data;
 }
 
 export async function loginUser(params: {
-  phoneNumber: string;
+  email?: string;
+  phoneNumber?: string;
   areaCode?: string;
-  password: string;
+  password?: string;
+  verifyCode?: string;
 }): Promise<{ imToken: string; chatToken: string; userID: string }> {
   const res = await fetch(`${CHAT_API}/account/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json", operationID: genOperationID() },
     body: JSON.stringify({
-      areaCode: params.areaCode || "+86",
-      phoneNumber: params.phoneNumber,
+      ...(params.email ? { email: params.email } : { areaCode: params.areaCode || "+86", phoneNumber: params.phoneNumber }),
       password: params.password,
+      verifyCode: params.verifyCode,
       platform: PLATFORM_ID,
       autoLogin: true,
     }),
@@ -153,16 +163,17 @@ export type {
 // ---------- Change Password ----------
 
 export async function changePassword(params: {
+  token: string;
   userID: string;
   oldPassword: string;
   newPassword: string;
 }): Promise<void> {
-  const res = await fetch(`${CHAT_API}/account/change_password`, {
+  const res = await fetch(`${CHAT_API}/account/password/change`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", operationID: genOperationID() },
+    headers: { "Content-Type": "application/json", token: params.token, operationID: genOperationID() },
     body: JSON.stringify({
       userID: params.userID,
-      oldPassword: params.oldPassword,
+      currentPassword: params.oldPassword,
       newPassword: params.newPassword,
     }),
   });
@@ -197,4 +208,24 @@ export async function saveFavorite(token: string, favorite: any): Promise<void> 
   const res = await fetch(`${CHAT_API}/user/favorites/save`, { method: "POST", headers: { "Content-Type": "application/json", token, operationID: genOperationID() }, body: JSON.stringify(favorite) });
   const data = await res.json();
   if (data.errCode !== 0) throw new Error(data.errMsg || "收藏失败");
+}
+
+export interface AccountProfile { email: string; phoneNumber: string; areaCode: string }
+async function profileRequest(path: string, token: string, body: object) {
+  const res = await fetch(`${CHAT_API}/user/${path}`, {
+    method: "POST", headers: { "Content-Type": "application/json", token, operationID: genOperationID() },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (data.errCode !== 0) throw new Error(data.errMsg || "保存账号资料失败");
+  return data.data;
+}
+export async function getAccountProfile(token: string): Promise<AccountProfile> {
+  return profileRequest("contact/get", token, {});
+}
+export async function saveContactProfile(token: string, profile: { phoneNumber: string; areaCode: string }): Promise<void> {
+  await profileRequest("contact/save", token, profile);
+}
+export async function bindEmail(token: string, email: string, verifyCode: string): Promise<void> {
+  await profileRequest("email/bind", token, { email, verifyCode });
 }

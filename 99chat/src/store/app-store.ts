@@ -2,6 +2,8 @@ import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import {
   getIMSDK,
+  getAccountProfile,
+  type AccountProfile,
   sdkLogin,
   sdkLogout,
   sendVerifyCode,
@@ -95,6 +97,7 @@ interface AppState {
   isInitialSyncing: boolean;
   authError: string | null;
   currentUser: SelfUserInfo | null;
+  accountProfile: AccountProfile | null;
   authData: AuthData | null;
 
   conversations: ConversationItem[];
@@ -115,8 +118,8 @@ interface AppState {
 
   // Auth
   sendCode: (phone: string, areaCode?: string, usedFor?: 1 | 2 | 3) => Promise<void>;
-  register: (params: { phoneNumber: string; verifyCode: string; nickname: string; password: string; areaCode?: string }) => Promise<void>;
-  login: (params: { phoneNumber: string; password: string; areaCode?: string }) => Promise<void>;
+  register: (params: { email?: string; phoneNumber?: string; verifyCode: string; nickname: string; password: string; areaCode?: string }) => Promise<void>;
+  login: (params: { email?: string; phoneNumber?: string; password?: string; verifyCode?: string; areaCode?: string }) => Promise<void>;
   restoreSession: () => Promise<void>;
   logout: () => Promise<void>;
   setAuthError: (err: string | null) => void;
@@ -330,6 +333,7 @@ export const useAppStore = create<AppState>()(
     isInitialSyncing: false,
     authError: null,
     currentUser: null,
+    accountProfile: null,
     authData: null,
     conversations: [],
     activeConversationID: null,
@@ -363,12 +367,12 @@ export const useAppStore = create<AppState>()(
         const data = await registerUser(params);
         saveSession(data);
         bindSDKListeners(getIMSDK());
-        set((s) => { s.authData = data; s.isInitialSyncing = true; });
+        set((s) => { s.authData = data; s.accountProfile = null; s.isInitialSyncing = true; });
         await sdkLogin(data.userID, data.imToken);
         await get().loadAllData();
         set((s) => { s.isAuthed = true; s.isLoggingIn = false; });
         const cu = get().currentUser;
-        if (cu) saveAccountToLocal(data, cu.nickname || "", cu.faceURL || "", params.phoneNumber);
+        if (cu) saveAccountToLocal(data, cu.nickname || "", cu.faceURL || "", params.phoneNumber || "");
       } catch (e: any) {
         clearSession();
         set((s) => { s.authError = e.message; s.isLoggingIn = false; });
@@ -383,12 +387,12 @@ export const useAppStore = create<AppState>()(
         const data = await loginUser(params);
         saveSession(data);
         bindSDKListeners(getIMSDK());
-        set((s) => { s.authData = data; s.isInitialSyncing = true; });
+        set((s) => { s.authData = data; s.accountProfile = null; s.isInitialSyncing = true; });
         await sdkLogin(data.userID, data.imToken);
         await get().loadAllData();
         set((s) => { s.isAuthed = true; s.isLoggingIn = false; });
         const cu = get().currentUser;
-        if (cu) saveAccountToLocal(data, cu.nickname || "", cu.faceURL || "", params.phoneNumber);
+        if (cu) saveAccountToLocal(data, cu.nickname || "", cu.faceURL || "", params.phoneNumber || "");
       } catch (e: any) {
         clearSession();
         set((s) => { s.authError = e.message; s.isLoggingIn = false; });
@@ -405,6 +409,7 @@ export const useAppStore = create<AppState>()(
         s.isInitialSyncing = false;
         s.authData = null;
         s.currentUser = null;
+        s.accountProfile = null;
         s.conversations = [];
         s.messagesMap = {};
         s.friends = [];
@@ -424,7 +429,7 @@ export const useAppStore = create<AppState>()(
       }
       try {
         bindSDKListeners(getIMSDK());
-        set((s) => { s.authData = data; s.isInitialSyncing = true; });
+        set((s) => { s.authData = data; s.accountProfile = null; s.isInitialSyncing = true; });
         await sdkLogin(data.userID, data.imToken);
         await get().loadAllData();
         set((s) => { s.isAuthed = true; });
@@ -442,6 +447,13 @@ export const useAppStore = create<AppState>()(
     loadAllData: async () => {
       const im = getIMSDK();
       bindSDKListeners(im);
+      try {
+        const token = get().authData?.chatToken;
+        if (token) {
+          const profile = await getAccountProfile(token);
+          set((s) => { s.accountProfile = profile; });
+        }
+      } catch (e) { console.error("读取账号资料失败", e); }
       try {
         const selfInfo = await im.getSelfUserInfo();
         set((s) => { s.currentUser = selfInfo.data; });

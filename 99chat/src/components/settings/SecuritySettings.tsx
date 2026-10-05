@@ -2,6 +2,7 @@ import { useState } from "react";
 import MobileBackButton from "../layout/MobileBackButton";
 import { Phone } from "lucide-react";
 import { useAppStore } from "../../store/app-store";
+import EmailBinding from "./EmailBinding";
 import { changePassword } from "../../services/openim";
 
 export default function SecuritySettings() {
@@ -14,7 +15,9 @@ export default function SecuritySettings() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const phone = (currentUser as any)?.phoneNumber || "未绑定";
+  const profile = useAppStore((s) => s.accountProfile);
+  const authData = useAppStore((s) => s.authData);
+  const phone = profile?.phoneNumber ? `${profile.areaCode} ${profile.phoneNumber}` : "未填写";
 
   const handleNext = () => {
     setError("");
@@ -42,6 +45,7 @@ export default function SecuritySettings() {
     setLoading(true);
     try {
       await changePassword({
+        token: authData!.chatToken,
         userID: currentUser?.userID || "",
         oldPassword,
         newPassword,
@@ -72,6 +76,8 @@ export default function SecuritySettings() {
           <span className="ml-auto text-sm text-gray-400">{phone}</span>
         </div>
       </div>
+
+      <EmailBinding />
 
       <div className="bg-white mt-2 border-y border-gray-100 p-5 space-y-3">
         <div className="text-sm font-medium text-gray-700">修改密码</div>

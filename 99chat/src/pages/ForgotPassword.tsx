@@ -1,17 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { MessageCircle, Phone, Lock, ShieldCheck, Loader2, ChevronDown, ArrowLeft, Eye, EyeOff } from "lucide-react";
+import { MessageCircle, Lock, ShieldCheck, Loader2, ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { useAppStore } from "../store/app-store";
 import { resetPassword } from "../services/openim";
-
-const AREA_CODES = [
-  { code: "+86", label: "+86 中国" },
-  { code: "+852", label: "+852 香港" },
-  { code: "+886", label: "+886 台湾" },
-  { code: "+65", label: "+65 新加坡" },
-  { code: "+60", label: "+60 马来西亚" },
-  { code: "+84", label: "+84 越南" },
-];
 
 export default function ForgotPassword() {
   const navigate = useNavigate();
@@ -19,7 +10,7 @@ export default function ForgotPassword() {
   const authError = useAppStore((s) => s.authError);
   const setAuthError = useAppStore((s) => s.setAuthError);
 
-  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -28,8 +19,6 @@ export default function ForgotPassword() {
   const [resetting, setResetting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [sendingCode, setSendingCode] = useState(false);
-  const [areaCode, setAreaCode] = useState("+86");
-  const [areaOpen, setAreaOpen] = useState(false);
 
   useEffect(() => { setAuthError(null); }, [setAuthError]);
 
@@ -41,10 +30,10 @@ export default function ForgotPassword() {
 
   const handleSendCode = async () => {
     if (sendingCode || resetting || countdown > 0) return;
-    if (!phone.trim()) { setAuthError("请输入手机号"); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { setAuthError("请输入有效邮箱"); return; }
     setSendingCode(true);
     try {
-      await sendCode(phone.trim(), areaCode, 2);
+      await sendCode(email.trim(), undefined, 2);
       setCountdown(60);
     } catch {}
     setSendingCode(false);
@@ -53,14 +42,14 @@ export default function ForgotPassword() {
   const handleReset = async () => {
     if (resetting || sendingCode) return;
     setAuthError(null);
-    if (!phone.trim() || !code.trim() || !password || !confirmPassword) {
+    if (!email.trim() || !code.trim() || !password || !confirmPassword) {
       setAuthError("请填写所有字段"); return;
     }
     if (password.length < 6) { setAuthError("新密码至少 6 位"); return; }
     if (password !== confirmPassword) { setAuthError("两次输入的新密码不一致"); return; }
     setResetting(true);
     try {
-      await resetPassword({ phoneNumber: phone.trim(), verifyCode: code.trim(), password, areaCode });
+      await resetPassword({ email: email.trim(), verifyCode: code.trim(), password });
       setSuccess(true);
     } catch (e: any) {
       setAuthError(e.message);
@@ -77,7 +66,7 @@ export default function ForgotPassword() {
             <MessageCircle size={32} />
           </div>
           <h1 className="text-2xl font-bold text-gray-800">重置密码</h1>
-          <p className="text-gray-400 text-sm mt-1">验证手机号并设置新密码</p>
+          <p className="text-gray-400 text-sm mt-1">验证绑定邮箱并设置新密码</p>
         </div>
 
         <button
@@ -95,43 +84,9 @@ export default function ForgotPassword() {
           <p role="status" className="text-sm text-green-600">密码重置成功，请使用新密码登录</p>
         ) : <fieldset disabled={resetting || sendingCode} className="space-y-4">
           <div>
-            <label className="text-sm text-gray-500 mb-1 block">手机号</label>
-            <div className="flex gap-2">
-              <div className="relative">
-                <button
-                  onClick={() => setAreaOpen(!areaOpen)}
-                  className="h-full pl-3 pr-2 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:border-primary-500 transition-colors flex items-center gap-1 whitespace-nowrap"
-                >
-                  {areaCode}
-                  <ChevronDown size={14} className="text-gray-400" />
-                </button>
-                {areaOpen && (
-                  <>
-                    <div className="fixed inset-0 z-10" onClick={() => setAreaOpen(false)} />
-                    <div className="absolute z-20 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-auto w-40">
-                      {AREA_CODES.map((ac) => (
-                        <button
-                          key={ac.code}
-                          onClick={() => { setAreaCode(ac.code); setAreaOpen(false); }}
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 transition-colors"
-                        >
-                          {ac.label}
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-              <div className="relative flex-1">
-                <Phone size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" />
-                <input
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:border-primary-500 transition-colors"
-                  placeholder="请输入手机号"
-                />
-              </div>
-            </div>
+            <label className="text-sm text-gray-500 mb-1 block">邮箱</label>
+            <input type="email" value={email} onChange={(e) => { setEmail(e.target.value); setCode(""); }} placeholder="请输入邮箱" className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:border-primary-500" />
+            <p className="text-xs text-gray-400 mt-2">旧手机号账号请先登录，在“安全”中绑定邮箱后使用。</p>
           </div>
 
           <div>

@@ -1,6 +1,7 @@
-import { useMemo, useState, useRef } from "react";
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Camera, Loader2 } from "lucide-react";
+import { saveContactProfile } from "../../services/openim";
 import { useAppStore } from "../../store/app-store";
 
 export default function ProfileEdit() {
@@ -15,15 +16,11 @@ export default function ProfileEdit() {
   const [avatarUrl, setAvatarUrl] = useState(currentUser?.faceURL || "");
   const [showQR, setShowQR] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-  const phoneNumber = useMemo(() => {
-    try {
-      const accounts = JSON.parse(localStorage.getItem("99chat_accounts") || "[]");
-      const account = accounts.find((item: { userID?: string }) => item.userID === currentUser?.userID);
-      return account?.phoneNumber || "";
-    } catch {
-      return "";
-    }
-  }, [currentUser?.userID]);
+  const accountProfile = useAppStore((s) => s.accountProfile);
+  const authData = useAppStore((s) => s.authData);
+  const [phoneNumber, setPhoneNumber] = useState(accountProfile?.phoneNumber || "");
+  const [areaCode, setAreaCode] = useState(accountProfile?.areaCode || "+86");
+  const [error, setError] = useState("");
 
   const handleAvatarSelect = () => fileRef.current?.click();
 
@@ -41,11 +38,15 @@ export default function ProfileEdit() {
 
   const handleSave = async () => {
     if (!nickname.trim()) return;
+    setError("");
+    if (phoneNumber && !/^[0-9]{5,15}$/.test(phoneNumber)) { setError("请输入有效手机号"); return; }
     setSaving(true);
     try {
       await updateSelfInfo({ nickname: nickname.trim(), faceURL: avatarUrl || undefined, ex: signature.trim() || undefined });
+      await saveContactProfile(authData!.chatToken, { phoneNumber, areaCode });
+      await useAppStore.getState().loadAllData();
       navigate("/settings");
-    } catch (err) { console.error(err); }
+    } catch (err: any) { setError(err.message); }
     setSaving(false);
   };
 
@@ -61,6 +62,7 @@ export default function ProfileEdit() {
         </button>
       </div>
 
+      {error && <p role="alert" className="p-3 text-sm text-red-500">{error}</p>}
       <input ref={fileRef} type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
 
       <div className="bg-white px-6 py-6 flex flex-col items-center border-b border-gray-50">
@@ -90,7 +92,10 @@ export default function ProfileEdit() {
         </div>
         <div className="px-5 py-3 flex items-center justify-between border-b border-gray-50">
           <span className="text-sm text-gray-500">电话号码</span>
-          <span className="text-sm text-gray-400">{phoneNumber || "未绑定"}</span>
+          <div className="flex gap-2 max-w-[70%]">
+            <select aria-label="手机号区号" value={areaCode} onChange={(e) => setAreaCode(e.target.value)} className="text-sm border rounded-lg p-1">{["+86", "+852", "+886", "+65", "+60", "+84"].map((value) => <option key={value}>{value}</option>)}</select>
+            <input aria-label="选填手机号" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value.trim())} placeholder="选填手机号" className="text-sm border rounded-lg p-1 w-32" />
+          </div>
         </div>
         <div className="px-5 py-3 flex items-center justify-between">
           <span className="text-sm text-gray-500">用户 ID</span>
