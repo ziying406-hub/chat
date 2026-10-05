@@ -19,7 +19,7 @@ import {
   type FriendApplicationItem,
   type SelfUserInfo,
 } from "../services/openim";
-import { GroupMemberFilter, GroupStatus, SessionType, MessageType } from "@openim/wasm-client-sdk";
+import { GroupMemberFilter, GroupStatus, SessionType, MessageType, type MessageReadReceipt } from "@openim/wasm-client-sdk";
 import { getUserStorageKey } from "../utils/storage";
 import { groupPermissions } from "../utils/group-permissions";
 import { unregisterWebPush } from "../services/push";
@@ -251,21 +251,29 @@ export const useAppStore = create<AppState>()(
           for (const msg of messages) {
             const peerUserID = msg.sendID === s.currentUser?.userID ? msg.recvID : msg.sendID;
             const cid = (msg as any).conversationID
-              || s.conversations.find((conversation) => conversation.groupID === msg.groupID || conversation.userID === peerUserID)?.conversationID
+              || s.conversations.find((conversation) => msg.groupID ? conversation.groupID === msg.groupID : conversation.conversationType === SessionType.Single && conversation.userID === peerUserID)?.conversationID
               || (msg.groupID ? `sg_${msg.groupID}` : s.currentUser?.userID && peerUserID ? `si_${[s.currentUser.userID, peerUserID].sort().join("_")}` : "");
             if (!cid) continue;
             if (!s.messagesMap[cid]) s.messagesMap[cid] = [];
             if (s.messagesMap[cid].find((m) => m.clientMsgID === msg.clientMsgID)) continue;
             s.messagesMap[cid].push(msg);
             if (msg.sendID !== s.currentUser?.userID) receivedNewMessage = true;
-            const conv = s.conversations.find((c) => c.conversationID === cid);
-            if (conv && cid !== s.activeConversationID) conv.unreadCount++;
           }
         });
         if (receivedNewMessage) playMessageTone(get().currentUser?.userID);
       };
       on(CbEvents.OnRecvNewMessage, receiveMessages);
       on(CbEvents.OnRecvNewMessages, receiveMessages);
+      on(CbEvents.OnRecvC2CReadReceipt, (receipts: MessageReadReceipt[]) => {
+        const readIDs = new Set(receipts.flatMap((receipt) => receipt.msgIDList));
+        set((s) => {
+          for (const messages of Object.values(s.messagesMap)) {
+            for (const message of messages) {
+              if (message.sendID === s.currentUser?.userID && readIDs.has(message.clientMsgID)) message.isRead = true;
+            }
+          }
+        });
+      });
       on(CbEvents.OnTotalUnreadMessageCountChanged, (data: any) => {
         set((s) => { s.totalUnread = data?.totalUnreadCount ?? 0; });
       });
@@ -512,7 +520,6 @@ export const useAppStore = create<AppState>()(
       if (id) {
         const conv = s.conversations.find((c) => c.conversationID === id);
         if (conv) {
-          conv.unreadCount = 0;
           s.activeConversationType = conv.conversationType;
         }
       }
@@ -791,9 +798,14 @@ export const useAppStore = create<AppState>()(
 
     markRead: async (conversationID) => {
       const im = getIMSDK();
+      const unreadIDs = new Set((get().messagesMap[conversationID] || []).filter((message) => message.sendID !== get().currentUser?.userID && !message.isRead).map((message) => message.clientMsgID));
       try {
         await im.markConversationMessageAsRead(conversationID);
-        set((s) => { const conv = s.conversations.find((c) => c.conversationID === conversationID); if (conv) conv.unreadCount = 0; });
+        set((s) => {
+          for (const message of s.messagesMap[conversationID] || []) {
+            if (unreadIDs.has(message.clientMsgID)) message.isRead = true;
+          }
+        });
       } catch (e) { console.error("markRead:", e); }
     },
 

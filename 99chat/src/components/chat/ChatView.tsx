@@ -96,13 +96,22 @@ export default function ChatView() {
   useEffect(() => {
     if (id) {
       loadMessages(id);
-      markRead(id);
       setInput(drafts[id] || "");
     }
     return () => {
       if (id && input.trim()) setDraft(id, input.trim());
     };
   }, [id]);
+
+  const unreadMessageIDs = messages.filter((message) => message.sendID !== currentUser?.userID && !message.isRead).map((message) => message.clientMsgID).join(",");
+  useEffect(() => {
+    const readVisibleConversation = () => {
+      if (id && messages.length && document.visibilityState === "visible" && (unreadMessageIDs || conv?.unreadCount)) void markRead(id);
+    };
+    readVisibleConversation();
+    document.addEventListener("visibilitychange", readVisibleConversation);
+    return () => document.removeEventListener("visibilitychange", readVisibleConversation);
+  }, [id, unreadMessageIDs, conv?.unreadCount, messages.length, markRead]);
 
   useEffect(() => {
     msgEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -667,9 +676,9 @@ export default function ChatView() {
                     {self && type < 900 && (
                       <div className="flex items-center justify-end gap-1 mt-0.5 pr-1">
                         {msg.status === 1 && <span className="text-[10px] text-gray-300">发送中</span>}
-                        {msg.status === 2 && (msg.isRead
-                          ? <CheckCheck size={14} className="text-primary-500" />
-                          : <Check size={12} className="text-gray-300" />)}
+                        {msg.status === 2 && (conv?.conversationType === SessionType.Single && msg.isRead
+                          ? <CheckCheck size={14} aria-label="已读" className="text-primary-500" />
+                          : <Check size={12} aria-label={conv?.conversationType === SessionType.Single ? "未读" : "发送成功"} className="text-gray-300" />)}
                         {msg.status === 3 && <span className="text-[10px] text-red-400">发送失败</span>}
                       </div>
                     )}
