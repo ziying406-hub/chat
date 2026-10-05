@@ -23,6 +23,7 @@ export default function App() {
   const isAuthed = useAppStore((s) => s.isAuthed);
   const darkMode = useAppStore((s) => s.darkMode);
   const restoreSession = useAppStore((s) => s.restoreSession);
+  const friendApplicationNotice = useAppStore((s) => s.friendApplicationNotice);
 
   const [pwaPrompt, setPwaPrompt] = useState<any>(null);
   const [iosInstall, setIosInstall] = useState(false);
@@ -141,6 +142,13 @@ export default function App() {
           <span className="text-sm text-gray-700 flex-1">{iosInstall ? "在 Safari 中点“分享”，再选择“添加到主屏幕”。" : "将 99chat 添加到主屏幕，获得更好体验"}</span>
           {!iosInstall && <button onClick={handleInstall} className="px-3 py-1.5 bg-primary-500 text-white rounded-lg text-sm hover:bg-primary-600 transition-colors">安装</button>}
           <button onClick={handleDismissPwa} className="shrink-0 px-3 py-1.5 bg-gray-100 text-gray-500 rounded-lg text-sm hover:bg-gray-200 transition-colors">稍后</button>
+        </div>
+      )}
+
+      {isAuthed && friendApplicationNotice && (
+        <div role="status" className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-gray-800 text-white rounded-xl shadow-lg px-4 py-3 flex items-center gap-3 max-w-[90%]">
+          <span className="text-sm">{friendApplicationNotice}</span>
+          <button onClick={() => useAppStore.setState({ friendApplicationNotice: null })} className="shrink-0 text-sm text-gray-300">关闭</button>
         </div>
       )}
 

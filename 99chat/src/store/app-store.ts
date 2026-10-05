@@ -108,6 +108,8 @@ interface AppState {
   groups: GroupItem[];
   groupMembersMap: Record<string, GroupMemberItem[]>;
   friendRequests: FriendApplicationItem[];
+  sentFriendRequests: FriendApplicationItem[];
+  friendApplicationNotice: string | null;
   groupRequests: any[];
   blackList: any[];
   totalUnread: number;
@@ -157,6 +159,7 @@ interface AppState {
 
   // Friends
   addFriend: (userID: string, reqMsg: string) => Promise<void>;
+  refreshFriendApplications: () => Promise<void>;
   acceptFriendRequest: (userID: string) => Promise<void>;
   rejectFriendRequest: (userID: string) => Promise<void>;
   deleteFriend: (userID: string) => Promise<void>;
@@ -279,9 +282,15 @@ export const useAppStore = create<AppState>()(
         set((s) => { s.friends = s.friends.filter((item) => item.userID !== friend.userID); });
       });
       const refreshFriendApplications = () => {
-        im.getFriendApplicationListAsRecipient({ handleResults: [], offset: 0, count: 100 }).then((res) => { set((s) => { s.friendRequests = res.data || []; }); });
+        void get().refreshFriendApplications().catch(console.error);
       };
       on(CbEvents.OnFriendApplicationAdded, refreshFriendApplications);
+      on(CbEvents.OnFriendApplicationRejected, (application: FriendApplicationItem) => {
+        refreshFriendApplications();
+        if (application.fromUserID === get().currentUser?.userID) {
+          set((s) => { s.friendApplicationNotice = `${application.toNickname || application.toUserID}拒绝了你的好友申请`; });
+        }
+      });
       on(CbEvents.OnFriendApplicationAccepted, () => {
         refreshFriendApplications();
         im.getFriendList().then((res) => { set((s) => { s.friends = res.data || []; }); });
@@ -343,6 +352,8 @@ export const useAppStore = create<AppState>()(
     groups: [],
     groupMembersMap: {},
     friendRequests: [],
+    sentFriendRequests: [],
+    friendApplicationNotice: null,
     groupRequests: [],
     totalUnread: 0,
     blackList: [],
@@ -416,6 +427,8 @@ export const useAppStore = create<AppState>()(
         s.groups = [];
         s.groupMembersMap = {};
         s.friendRequests = [];
+        s.sentFriendRequests = [];
+        s.friendApplicationNotice = null;
         s.groupRequests = [];
         s.activeConversationID = null;
       });
@@ -479,8 +492,7 @@ export const useAppStore = create<AppState>()(
       } catch {}
 
       try {
-        const reqRes = await im.getFriendApplicationListAsRecipient({ handleResults: [], offset: 0, count: 100 });
-        set((s) => { s.friendRequests = reqRes.data || []; });
+        await get().refreshFriendApplications();
       } catch {}
 
       try {
@@ -1053,6 +1065,17 @@ export const useAppStore = create<AppState>()(
     addFriend: async (userID, reqMsg) => {
       const result = await getIMSDK().addFriend({ toUserID: userID, reqMsg });
       if (result.errCode !== 0) throw new Error(result.errMsg || "发送好友申请失败");
+    },
+    refreshFriendApplications: async () => {
+      const im = getIMSDK();
+      const [received, sent] = await Promise.all([
+        im.getFriendApplicationListAsRecipient({ handleResults: [], offset: 0, count: 100 }),
+        im.getFriendApplicationListAsApplicant({ offset: 0, count: 100 }),
+      ]);
+      set((s) => {
+        s.friendRequests = received.data || [];
+        s.sentFriendRequests = sent.data || [];
+      });
     },
     acceptFriendRequest: async (userID) => {
       const im = getIMSDK();

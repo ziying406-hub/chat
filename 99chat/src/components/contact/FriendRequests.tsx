@@ -8,6 +8,8 @@ import { useEffect, useState } from "react";
 export default function FriendRequests() {
   const navigate = useNavigate();
   const requests = useAppStore((s) => s.friendRequests);
+  const sentRequests = useAppStore((s) => s.sentFriendRequests);
+  const refreshApplications = useAppStore((s) => s.refreshFriendApplications);
   const accept = useAppStore((s) => s.acceptFriendRequest);
   const reject = useAppStore((s) => s.rejectFriendRequest);
   const currentUser = useAppStore((s) => s.currentUser);
@@ -18,7 +20,7 @@ export default function FriendRequests() {
   const [shareUserID, setShareUserID] = useState("");
   const [addUserID, setAddUserID] = useState("");
   const [addSuccess, setAddSuccess] = useState(false);
-  const [tab, setTab] = useState<"pending" | "handled">("pending");
+  const [tab, setTab] = useState<"pending" | "handled" | "sent">("pending");
 
   const addFriend = useAppStore((s) => s.addFriend);
   const [refreshing, setRefreshing] = useState(false);
@@ -27,8 +29,7 @@ export default function FriendRequests() {
     setRefreshing(true);
     try {
       const im = getIMSDK();
-      const res = await im.getFriendApplicationListAsRecipient({ handleResults: [], offset: 0, count: 100 });
-      useAppStore.setState({ friendRequests: res.data || [] });
+      await refreshApplications();
       const frRes = await im.getFriendList();
       useAppStore.setState({ friends: frRes.data || [] });
     } catch (e) { console.error(e); }
@@ -54,7 +55,7 @@ export default function FriendRequests() {
 
   const pendingRequests = requests.filter((r: any) => r.handleResult === ApplicationHandleResult.Unprocessed);
   const handledRequests = requests.filter((r: any) => r.handleResult !== ApplicationHandleResult.Unprocessed);
-  const visibleRequests = tab === "pending" ? pendingRequests : handledRequests;
+  const visibleRequests = tab === "sent" ? sentRequests : tab === "pending" ? pendingRequests : handledRequests;
 
   return (
     <div className="flex-1 flex flex-col bg-gray-50">
@@ -94,6 +95,9 @@ export default function FriendRequests() {
         >
           已处理
         </button>
+        <button onClick={() => setTab("sent")} className={`flex-1 py-2.5 text-sm font-medium transition-colors ${tab === "sent" ? "text-primary-600 border-b-2 border-primary-500" : "text-gray-400"}`}>
+          我发出的
+        </button>
       </div>
 
       {/* Requests list */}
@@ -104,17 +108,21 @@ export default function FriendRequests() {
         {visibleRequests.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 text-gray-300 text-sm gap-2">
             <Check size={28} className="opacity-30" />
-            <span>{tab === "pending" ? "暂无待处理申请" : "暂无已处理申请"}</span>
+            <span>{tab === "sent" ? "暂无发出的申请" : tab === "pending" ? "暂无待处理申请" : "暂无已处理申请"}</span>
           </div>
         )}
         {visibleRequests.map((r: any) => (
           <div key={`${r.fromUserID}-${r.createTime}`} className="bg-white px-5 py-4 border-b border-gray-50 flex items-center gap-3">
-            <img src={r.fromFaceURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${r.fromUserID}`} alt="" className="w-12 h-12 rounded-xl object-cover bg-gray-100" />
+            <img src={(tab === "sent" ? r.toFaceURL : r.fromFaceURL) || `https://api.dicebear.com/7.x/avataaars/svg?seed=${tab === "sent" ? r.toUserID : r.fromUserID}`} alt="" className="w-12 h-12 rounded-xl object-cover bg-gray-100" />
             <div className="flex-1">
-              <p className="text-sm font-medium text-gray-800">{r.fromNickname || r.fromUserID}</p>
+              <p className="text-sm font-medium text-gray-800">{tab === "sent" ? r.toNickname || r.toUserID : r.fromNickname || r.fromUserID}</p>
               <p className="text-xs text-gray-400 mt-0.5">"{r.reqMsg || "请求添加好友"}"</p>
             </div>
-            {r.handleResult === ApplicationHandleResult.Unprocessed ? (
+            {tab === "sent" ? (
+              <span className={`text-xs px-3 py-1 rounded-full ${r.handleResult === ApplicationHandleResult.Accepted ? "bg-green-50 text-green-500" : r.handleResult === ApplicationHandleResult.Rejected ? "bg-red-50 text-red-500" : "bg-gray-100 text-gray-400"}`}>
+                {r.handleResult === ApplicationHandleResult.Unprocessed ? "等待对方同意" : r.handleResult === ApplicationHandleResult.Accepted ? "对方已同意" : "对方已拒绝"}
+              </span>
+            ) : r.handleResult === ApplicationHandleResult.Unprocessed ? (
               <div className="flex gap-2">
                 <button aria-label={`同意 ${r.fromNickname || r.fromUserID}`} onClick={() => accept(r.fromUserID)} className="w-9 h-9 rounded-lg bg-primary-50 text-primary-500 hover:bg-primary-100 transition-colors flex items-center justify-center"><Check size={18} /></button>
                 <button aria-label={`拒绝 ${r.fromNickname || r.fromUserID}`} onClick={() => reject(r.fromUserID)} className="w-9 h-9 rounded-lg bg-gray-50 text-gray-400 hover:bg-gray-100 transition-colors flex items-center justify-center"><X size={18} /></button>
