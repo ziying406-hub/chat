@@ -59,10 +59,10 @@ const [a, b] = JSON.parse(fs.readFileSync(process.env.TEST_FIXTURES));
         body: JSON.stringify({ userID: user.userID, seqRanges: [{ conversationID, begin: 1, end: 100, num: 100 }] }),
       })).json();
       assert.equal(response.errCode, 0, response.errMsg);
-      const messages = response.data.msgs?.[conversationID]?.Msgs || [];
-      const old = messages.find(msg => msg.contentType === 101 && JSON.parse(Buffer.from(msg.content, 'base64').toString()).content === oldText);
+      const messages = (response.data.msgs?.[conversationID]?.Msgs || []).filter(msg => msg.contentType === 101 && msg.status < 4);
+      const old = messages.find(msg => JSON.parse(Buffer.from(msg.content, 'base64').toString()).content === oldText);
       if (old) oldSentAt = old.sendTime;
-      return messages.filter(msg => msg.contentType === 101 && msg.status < 4).map(msg => JSON.parse(Buffer.from(msg.content, 'base64').toString()).content);
+      return messages.map(msg => JSON.parse(Buffer.from(msg.content, 'base64').toString()).content);
     }
     assert.ok((await serverHistory(b)).includes(oldText));
     assert.ok(oldSentAt);
@@ -78,9 +78,16 @@ const [a, b] = JSON.parse(fs.readFileSync(process.env.TEST_FIXTURES));
     assert.ok((await serverHistory(a)).includes(control));
     assert.ok((await serverHistory(b)).includes(oldText));
     assert.ok((await serverHistory(b)).includes(control));
+    await pa.getByRole('button', { name: '更多聊天操作', exact: true }).click();
+    await pa.getByRole('button', { name: '多选', exact: true }).click();
+    await bubble(pa, control).locator('../..').getByRole('button', { name: /^选择消息 / }).click();
+    await pa.getByRole('button', { name: '删除', exact: true }).click();
+    await bubble(pa, control).waitFor({ state: 'detached' });
+    assert.ok(!(await serverHistory(a)).includes(control));
+    assert.ok((await serverHistory(b)).includes(control));
     await pa.reload({ waitUntil: 'domcontentloaded' });
     await pa.getByPlaceholder('输入消息...').waitFor();
     assert.equal(await bubble(pa, oldText).count(), 0);
-    console.log('PASS old group text deletion, own reload and native server persistence, preserved other message and unaffected other member');
+    console.log('PASS old group text deletion, own reload and native server persistence, preserved unselected message, multi-select deletion and unaffected other member');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exit(1); });
