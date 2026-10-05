@@ -533,7 +533,11 @@ export const useAppStore = create<AppState>()(
         set((s) => {
           const messages = new Map<string, MessageItem>();
           for (const message of history) messages.set(message.clientMsgID, message);
-          for (const message of s.messagesMap[conversationID] || []) messages.set(message.clientMsgID, message);
+          for (const message of s.messagesMap[conversationID] || []) {
+            const loaded = messages.get(message.clientMsgID);
+            if (loaded) loaded.isRead = loaded.isRead || message.isRead;
+            else messages.set(message.clientMsgID, message);
+          }
           s.messagesMap[conversationID] = [...messages.values()].sort((a, b) => a.sendTime - b.sendTime);
         });
       } catch (e) { console.error("loadMessages:", e); }

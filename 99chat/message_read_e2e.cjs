@@ -32,11 +32,15 @@ const BASE = process.env.E2E_BASE || 'http://localhost:5199';
   try {
     const pa = await login(a), pb = await login(b);
     await openChat(pa, b);
+    await pb.goto(`${BASE}/#/messages`);
+    const unreadBadge = pb.locator('div.cursor-pointer.group').filter({ has: pb.getByText(a.nickname, { exact: true }) }).locator('span.bg-red-500');
     const first = await send(pa);
+    await unreadBadge.waitFor();
     assert.equal(await bubble(pa, first).locator('svg.lucide-check-check').count(), 0);
     await openChat(pb, a);
     await bubble(pb, first).waitFor();
     await bubble(pa, first).locator('svg.lucide-check-check').waitFor({ timeout: 15000 });
+    await unreadBadge.waitFor({ state: 'hidden' });
     const second = await send(pa);
     await bubble(pb, second).waitFor();
     await bubble(pa, second).locator('svg.lucide-check-check').waitFor({ timeout: 15000 });
@@ -49,7 +53,18 @@ const BASE = process.env.E2E_BASE || 'http://localhost:5199';
     await bubble(pa, third).locator('svg.lucide-check').waitFor();
     assert.equal(await bubble(pa, third).locator('svg.lucide-check-check').count(), 0);
     await openChat(pb, a);
-    await bubble(pa, third).locator('svg.lucide-check-check').waitFor({ timeout: 15000 });
+    try {
+      await bubble(pa, third).locator('svg.lucide-check-check').waitFor({ timeout: 15000 });
+    } catch (error) {
+      console.log('Native sender history:', await pa.evaluate(async text => {
+        const conversationID = location.hash.split('/').pop();
+        const raw = await window.getAdvancedHistoryMessageList(String(Date.now()), JSON.stringify({ conversationID, count: 50, startClientMsgID: '', viewType: 0 }));
+        const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        const message = data.messageList.find(item => item.textElem?.content === text);
+        return { isRead: message?.isRead, status: message?.status };
+      }, third));
+      throw error;
+    }
     console.log('PASS real unread before opening, live receipt on opening, continued reading, reload persistence and unread while away');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exit(1); });

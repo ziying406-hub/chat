@@ -24,6 +24,7 @@ export default function ChatView() {
   const conv = useAppStore((s) => s.conversations.find((c) => c.conversationID === id));
   const messages = useAppStore((s) => (id ? s.messagesMap[id] : undefined)) || [];
   const currentUser = useAppStore((s) => s.currentUser);
+  const isInitialSyncing = useAppStore((s) => s.isInitialSyncing);
   const friends = useAppStore((s) => s.friends);
   const loadMessages = useAppStore((s) => s.loadMessages);
   const sendText = useAppStore((s) => s.sendTextMessage);
@@ -95,7 +96,6 @@ export default function ChatView() {
 
   useEffect(() => {
     if (id) {
-      loadMessages(id);
       setInput(drafts[id] || "");
     }
     return () => {
@@ -103,15 +103,19 @@ export default function ChatView() {
     };
   }, [id]);
 
+  useEffect(() => {
+    if (id && !isInitialSyncing) void loadMessages(id);
+  }, [id, isInitialSyncing, loadMessages]);
+
   const unreadMessageIDs = messages.filter((message) => message.sendID !== currentUser?.userID && !message.isRead).map((message) => message.clientMsgID).join(",");
   useEffect(() => {
     const readVisibleConversation = () => {
-      if (id && messages.length && document.visibilityState === "visible" && (unreadMessageIDs || conv?.unreadCount)) void markRead(id);
+      if (id && !isInitialSyncing && messages.length && document.visibilityState === "visible" && (unreadMessageIDs || conv?.unreadCount)) void markRead(id);
     };
     readVisibleConversation();
     document.addEventListener("visibilitychange", readVisibleConversation);
     return () => document.removeEventListener("visibilitychange", readVisibleConversation);
-  }, [id, unreadMessageIDs, conv?.unreadCount, messages.length, markRead]);
+  }, [id, isInitialSyncing, unreadMessageIDs, conv?.unreadCount, messages.length, markRead]);
 
   useEffect(() => {
     msgEndRef.current?.scrollIntoView({ behavior: "smooth" });
