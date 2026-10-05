@@ -196,7 +196,7 @@ export default function UserProfile() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setShowDelete(false)}>
           <div className="bg-white rounded-2xl p-6 w-72 flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-base font-semibold text-gray-800">删除好友</h3>
-            <p className="text-sm text-gray-500">确定要删除好友 "{(user as any).nickname || id}" 吗？删除后将无法恢复。</p>
+            <p className="text-sm text-gray-500">确定要删除好友 "{(user as any).nickname || id}" 吗？删除后对方不能再给你发送私聊消息，重新添加好友后恢复。</p>
             <div className="flex gap-3 justify-end">
               <button onClick={() => setShowDelete(false)} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">取消</button>
               <button onClick={handleDelete} className="px-4 py-2 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors">删除</button>

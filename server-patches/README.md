@@ -58,3 +58,30 @@ E2E_BASE=https://<部署域名> TEST_VERIFY_CODE=<环境验证码> node web_mult
 测试用独立账号验证双 Web Token、双端收发、刷新和单端退出；通过真实平台登录/API 验证 iOS、Android、Windows、Mac 仍互踢旧 Token。不代表原生客户端 UI 已实测。
 
 生产候选镜像 `99chat/openim-server:web-only-multilogin`；Compose 仍保留 `policy: 1` 和 Firebase 挂载。回滚使用 `/opt/openim/backups/compose.before-web-multilogin.yml` 中原配置，再仅重建 `openim-server`，不要删除数据卷。
+
+## 删除好友后拒收私聊
+
+OpenIM 原生删除好友是单向删除。开启 `openim-rpc-msg.yml` 的 `friendVerify` 后，
+服务端发送私聊时检查接收方是否仍将发送方列为好友，否则返回 `1303 NotPeersFriend`。
+删除好友会清除双方关系缓存，重新添加好友后即可恢复；历史记录保留，群消息仍按群权限判断。
+
+`friend-verification.compose.yml` 使用原生环境变量覆盖该配置，无需修改服务端镜像。
+部署时也可以将 `IMENV_OPENIM_RPC_MSG_FRIENDVERIFY: "true"` 写入已有 Compose 的
+`openim-server.environment`，保留其他环境变量、挂载和镜像，然后仅重建该服务。
+
+```sh
+docker compose -f <现有compose文件> -f <本仓库>/server-patches/friend-verification.compose.yml up -d --no-deps openim-server
+```
+
+经用户确认后运行独立双账号回归；它会创建账号和保留测试消息，不使用已有用户。
+`TEST_FIXTURES` 指向权限 0600 的临时凭据文件，复用时应保密且不要提交。
+本地验证码仅适用于关闭真实邮件验证的开发环境；线上通过私有 `TEST_CODE_READER` 获取验证码，禁止使用开发万能码。
+
+```sh
+cd 99chat
+TEST_FIXTURES=/tmp/99chat-friend-local.json node friend_delete_e2e.cjs
+# 线上显式设置 E2E_BASE、E2E_CHAT_API、E2E_IM_API、E2E_WS、TEST_CODE_READER 和 TEST_FIXTURES。
+```
+
+测试先成功发送以预热校验缓存，再删除好友，断言原生 SDK 发送返回 1303；
+重新添加后确认成功送达，并重新登录接收账号检查被拒绝消息没有进入历史记录。

@@ -1,0 +1,6 @@
+# Native OpenIM private-message authorization: the receiver must still have
+# the sender in their friend list. Group messages retain their own rules.
+services:
+  openim-server:
+    environment:
+      IMENV_OPENIM_RPC_MSG_FRIENDVERIFY: "true"
