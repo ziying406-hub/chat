@@ -1,4 +1,4 @@
-const CACHE_NAME = "99chat-email-auth-v3";
+const CACHE_NAME = "99chat-email-auth-v4";
 const CORE_ASSETS = [
   "/",
   "/index.html",

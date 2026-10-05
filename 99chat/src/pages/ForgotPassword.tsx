@@ -86,7 +86,7 @@ export default function ForgotPassword() {
           <div>
             <label className="text-sm text-gray-500 mb-1 block">邮箱</label>
             <input type="email" value={email} onChange={(e) => { setEmail(e.target.value); setCode(""); }} placeholder="请输入邮箱" className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:border-primary-500" />
-            <p className="text-xs text-gray-400 mt-2">旧手机号账号请先登录，在“安全”中绑定邮箱后使用。</p>
+            <p className="text-xs text-gray-400 mt-2">请使用账号已绑定的邮箱找回密码。</p>
           </div>
 
           <div>

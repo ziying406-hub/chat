@@ -16,6 +16,9 @@ async function request(path, body, token = '') {
   try {
     page.setDefaultTimeout(30000);
     await page.goto(`${BASE}/#/auth/sign-in`);
+    assert.equal(await page.getByRole('button', { name: '旧账号手机号登录', exact: true }).count(), 0);
+    assert.equal(await page.getByPlaceholder('请输入手机号').count(), 0);
+    await page.getByPlaceholder('请输入邮箱', { exact: true }).waitFor();
     await page.getByRole('button', { name: '注册', exact: true }).first().click();
     await page.getByPlaceholder('请输入昵称').fill('email-auth-qa');
     await page.getByPlaceholder('请输入邮箱', { exact: true }).fill(email);
@@ -82,13 +85,10 @@ async function request(path, body, token = '') {
     const boundEmail = `legacy-${Date.now()}@example.com`, lt = legacy.data.chatToken;
     assert.notEqual((await request('/user/email/bind', { email: boundEmail, verifyCode: 'wrong-code' }, lt)).errCode, 0);
     assert.notEqual((await request('/user/update', { userID: legacy.data.userID, email: boundEmail }, lt)).errCode, 0);
-    await page.goto(`${BASE}/#/auth/sign-in`);
-    await page.getByRole('button', { name: '旧账号手机号登录', exact: true }).click();
-    await page.getByPlaceholder('请输入手机号').fill(phoneNumber);
-    await page.getByPlaceholder('请输入密码', { exact: true }).fill(password);
-    await page.getByRole('button', { name: '登录', exact: true }).click();
-    await page.waitForURL('**/#/messages');
+    // Restore the real fixture session to test email binding independently of the removed phone login UI.
+    await page.evaluate(data => localStorage.setItem('99chat_session', JSON.stringify(data)), legacy.data);
     await page.goto(`${BASE}/#/settings/security`);
+    await page.reload();
     await page.getByPlaceholder('请输入要绑定的邮箱').fill(boundEmail);
     const bindSent = page.waitForResponse(res => res.url().endsWith('/account/code/send'));
     await page.getByRole('button', { name: '获取验证码', exact: true }).click();

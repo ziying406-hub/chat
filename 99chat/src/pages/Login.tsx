@@ -25,7 +25,6 @@ export default function Login() {
 
   const [tab, setTab] = useState<Tab>("login");
   const [email, setEmail] = useState("");
-  const [phoneLogin, setPhoneLogin] = useState(false);
   const [confirmPassword, setConfirmPassword] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
@@ -47,10 +46,10 @@ export default function Login() {
     return true;
   };
   const handleLogin = async () => {
-    if (phoneLogin ? !phone.trim() : !validEmail()) return;
+    if (!validEmail()) return;
     if (!password) { setAuthError("请输入密码"); return; }
     try {
-      await login({ ...(phoneLogin ? { phoneNumber: phone.trim(), areaCode } : { email: email.trim() }), password });
+      await login({ email: email.trim(), password });
       navigate("/messages", { replace: true });
     } catch {}
   };
@@ -107,11 +106,11 @@ export default function Login() {
             className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${tab === "login" ? "bg-white text-primary-600 shadow-sm" : "text-gray-400"}`}
           >密码登录</button>
           <button
-            onClick={() => { setTab("verify"); setCode(""); setPhoneLogin(false); setAuthError(null); }}
+            onClick={() => { setTab("verify"); setCode(""); setAuthError(null); }}
             className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${tab === "verify" ? "bg-white text-primary-600 shadow-sm" : "text-gray-400"}`}
           >验证码登录</button>
           <button
-            onClick={() => { setTab("register"); setCode(""); setPhoneLogin(false); setAuthError(null); }}
+            onClick={() => { setTab("register"); setCode(""); setAuthError(null); }}
             className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${tab === "register" ? "bg-white text-primary-600 shadow-sm" : "text-gray-400"}`}
           >注册</button>
         </div>
@@ -136,12 +135,11 @@ export default function Login() {
             </div>
           )}
 
-          {tab === "login" && <button onClick={() => { setPhoneLogin(!phoneLogin); setAuthError(null); }} className="text-sm text-primary-500">{phoneLogin ? "切换邮箱登录" : "旧账号手机号登录"}</button>}
-          {(!phoneLogin || tab !== "login") && <div>
+          <div>
             <label className="text-sm text-gray-500 mb-1 block">邮箱</label>
             <input type="email" value={email} onChange={(e) => { setEmail(e.target.value); setCode(""); }} autoComplete="email" placeholder="请输入邮箱" className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:border-primary-500" />
-          </div>}
-          {(tab === "register" || (tab === "login" && phoneLogin)) && (
+          </div>
+          {tab === "register" && (
           <div>
             <label className="text-sm text-gray-500 mb-1 block">{tab === "register" ? "手机号（选填）" : "手机号"}</label>
             <div className="flex gap-2">
