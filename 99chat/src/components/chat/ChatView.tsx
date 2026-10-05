@@ -5,7 +5,7 @@ import {
   Video, MoreVertical, Smile, Paperclip, Send, Image as ImageIcon, Mic,
   ArrowLeft, RotateCcw, Copy, Forward, Reply, Check, CheckCheck,
   Play, Pause, X, Search, Contact, UserPlus, BellOff, Star,
-  Camera, MapPin, Settings, CheckSquare, Square,
+  Camera, MapPin, Settings, CheckSquare, Square, Trash2,
 } from "lucide-react";
 import { useAppStore } from "../../store/app-store";
 import { formatMessageDate, formatTime, formatVoiceDuration, isSameCalendarDay } from "../../utils/format";
@@ -36,7 +36,7 @@ export default function ChatView() {
   const forwardMsg = useAppStore((s) => s.forwardMessage);
   const forwardMergedMessages = useAppStore((s) => s.forwardMergedMessages);
   const markRead = useAppStore((s) => s.markRead);
-  const deleteMessagesFromLocalStorage = useAppStore((s) => s.deleteMessagesFromLocalStorage);
+  const deleteMessages = useAppStore((s) => s.deleteMessages);
   const revokeMsg = useAppStore((s) => s.revokeMessage);
   const groupMembers = useAppStore((s) => s.groupMembersMap);
   const loadGroupMembers = useAppStore((s) => s.loadGroupMembers);
@@ -388,8 +388,8 @@ export default function ChatView() {
   const handleBatchDelete = async () => {
     if (!id || selectedMsgs.size === 0) return;
     try {
-      await deleteMessagesFromLocalStorage(id, [...selectedMsgs]);
-      showToast("已从本机删除选中消息");
+      await deleteMessages(id, [...selectedMsgs]);
+      showToast("已从我的聊天记录删除选中消息");
     } catch {
       showToast("删除消息失败");
     } finally {
@@ -710,6 +710,13 @@ export default function ChatView() {
                           } catch { showToast("收藏仅保存在本机，服务端暂不可用"); }
                           setContextMsg(null);
                         }} className="w-full px-3 py-1.5 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><Star size={12} /> 收藏</button>
+                        <button onClick={async () => {
+                          setContextMsg(null);
+                          try {
+                            await deleteMessages(id!, [msg.clientMsgID]);
+                            showToast("已从我的聊天记录删除");
+                          } catch { showToast("删除消息失败"); }
+                        }} className="w-full px-3 py-1.5 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><Trash2 size={12} /> 删除</button>
                         {self && canRevoke(msg) && <button onClick={async () => { try { await revokeMsg(id!, msg.clientMsgID); } catch { showToast("撤回失败"); } finally { setContextMsg(null); } }} className="w-full px-3 py-1.5 text-left hover:bg-gray-50 text-gray-600 flex items-center gap-2"><RotateCcw size={12} /> 撤回</button>}
                         {self && !canRevoke(msg) && <button onClick={() => { setContextMsg(null); showToast("超过2分钟无法撤回"); }} className="w-full px-3 py-1.5 text-left hover:bg-gray-50 text-gray-300 flex items-center gap-2"><RotateCcw size={12} /> 撤回</button>}
                       </div>

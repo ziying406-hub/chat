@@ -145,7 +145,7 @@ interface AppState {
   pinConversation: (conversationID: string, isPinned: boolean) => Promise<void>;
   muteConversation: (conversationID: string, opt: number) => Promise<void>;
   deleteConversation: (conversationID: string) => Promise<void>;
-  deleteMessagesFromLocalStorage: (conversationID: string, clientMsgIDs: string[]) => Promise<void>;
+  deleteMessages: (conversationID: string, clientMsgIDs: string[]) => Promise<void>;
   hideConversation: (conversationID: string) => Promise<void>;
   revokeMessage: (conversationID: string, clientMsgID: string) => Promise<void>;
   sendQuoteMessage: (conversationID: string, text: string, quoteMessage: string) => Promise<void>;
@@ -879,11 +879,11 @@ export const useAppStore = create<AppState>()(
       }
     },
 
-    deleteMessagesFromLocalStorage: async (conversationID, clientMsgIDs) => {
+    deleteMessages: async (conversationID, clientMsgIDs) => {
       if (clientMsgIDs.length === 0) return;
       const im = getIMSDK();
       for (const clientMsgID of clientMsgIDs) {
-        const result = await im.deleteMessageFromLocalStorage({ conversationID, clientMsgID });
+        const result = await im.deleteMessage({ conversationID, clientMsgID });
         if (result.errCode !== 0) throw new Error(result.errMsg || "删除消息失败");
       }
       set((s) => {
