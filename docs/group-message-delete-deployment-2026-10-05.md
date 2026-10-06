@@ -31,3 +31,5 @@ E2E_BASE=https://999.99chat99.com TEST_FIXTURES=/tmp/99chat-friend-live.json TES
 ```
 
 两份 fixture 只保存在本机，不提交账号凭据。
+
+后续：上述新浏览器群历史异常已于 2026-10-06 修复并完成真实双账号回归，见 [群历史恢复发布记录](group-history-deployment-2026-10-06.md)。
