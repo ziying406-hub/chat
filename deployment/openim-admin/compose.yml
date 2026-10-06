@@ -1,0 +1,20 @@
+services:
+  admin:
+    image: openim/openim-admin-front:release-v1.8.4-patch.2
+    container_name: openim-admin-front
+    restart: unless-stopped
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - existing
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: "99chat_default"
+      traefik.http.routers.openim-admin.rule: "Host(`admin.99chat99.com`)"
+      traefik.http.routers.openim-admin.entrypoints: "websecure"
+      traefik.http.routers.openim-admin.tls.certresolver: "letsencrypt"
+      traefik.http.services.openim-admin.loadbalancer.server.port: "80"
+networks:
+  existing:
+    external: true
+    name: 99chat_default
