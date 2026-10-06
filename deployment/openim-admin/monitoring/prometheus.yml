@@ -1,0 +1,47 @@
+global:
+  scrape_interval: 15s
+scrape_configs:
+  - job_name: openimserver-openim-api
+    http_sd_configs:
+      - url: http://openim-server:10002/prometheus_discovery/api
+        refresh_interval: 30s
+  - job_name: openimserver-openim-msggateway
+    http_sd_configs:
+      - url: http://openim-server:10002/prometheus_discovery/msg_gateway
+        refresh_interval: 30s
+  - job_name: openimserver-openim-msgtransfer
+    http_sd_configs:
+      - url: http://openim-server:10002/prometheus_discovery/msg_transfer
+        refresh_interval: 30s
+  - job_name: openimserver-openim-push
+    http_sd_configs:
+      - url: http://openim-server:10002/prometheus_discovery/push
+        refresh_interval: 30s
+  - job_name: openimserver-openim-rpc-auth
+    http_sd_configs:
+      - url: http://openim-server:10002/prometheus_discovery/auth
+        refresh_interval: 30s
+  - job_name: openimserver-openim-rpc-conversation
+    http_sd_configs:
+      - url: http://openim-server:10002/prometheus_discovery/conversation
+        refresh_interval: 30s
+  - job_name: openimserver-openim-rpc-friend
+    http_sd_configs:
+      - url: http://openim-server:10002/prometheus_discovery/friend
+        refresh_interval: 30s
+  - job_name: openimserver-openim-rpc-group
+    http_sd_configs:
+      - url: http://openim-server:10002/prometheus_discovery/group
+        refresh_interval: 30s
+  - job_name: openimserver-openim-rpc-msg
+    http_sd_configs:
+      - url: http://openim-server:10002/prometheus_discovery/msg
+        refresh_interval: 30s
+  - job_name: openimserver-openim-rpc-third
+    http_sd_configs:
+      - url: http://openim-server:10002/prometheus_discovery/third
+        refresh_interval: 30s
+  - job_name: openimserver-openim-rpc-user
+    http_sd_configs:
+      - url: http://openim-server:10002/prometheus_discovery/user
+        refresh_interval: 30s

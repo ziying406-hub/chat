@@ -33,3 +33,22 @@ const groups = await post('/api/group/get_groups', { pagination: { pageNumber: 1
 assert.equal(groups.errCode, 0, groups.errMsg);
 assert.ok(groups.data.groups.length > 0, 'Existing groups must be returned');
 console.log(`PASS HTTPS frontend, unauthenticated rejection, native admin login/profile, ${users.data.userIDs.length} users and ${groups.data.groups.length} groups`);
+
+const redirect = await fetch(`${base}/api/third/prometheus`, { redirect: 'manual' });
+assert.equal(redirect.status, 302);
+assert.equal(redirect.headers.get('location'), '/grafana/d/openim/99chat?orgId=1');
+const grafanaHeaders = { Authorization: `Basic ${Buffer.from(`${credentials.account}:${credentials.password}`).toString('base64')}` };
+async function grafana(path) {
+  const response = await fetch(`${base}/grafana${path}`, { headers: grafanaHeaders });
+  assert.equal(response.status, 200, path);
+  return response.json();
+}
+const health = await grafana('/api/health');
+assert.equal(health.database, 'ok');
+const dashboard = await grafana('/api/dashboards/uid/openim');
+assert.ok(dashboard.dashboard.panels.length > 0);
+const metrics = await grafana('/api/datasources/proxy/uid/prometheus/api/v1/query?query=up');
+assert.equal(metrics.status, 'success');
+assert.ok(metrics.data.result.length >= 11, 'All native OpenIM services must be discovered');
+assert.ok(metrics.data.result.every(series => series.value[1] === '1'), 'All discovered service metrics must be reachable');
+console.log(`PASS monitor entry redirect, authenticated Grafana, provisioned dashboard, ${metrics.data.result.length} healthy OpenIM scrape targets`);

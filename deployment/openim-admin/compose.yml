@@ -14,7 +14,38 @@ services:
       traefik.http.routers.openim-admin.entrypoints: "websecure"
       traefik.http.routers.openim-admin.tls.certresolver: "letsencrypt"
       traefik.http.services.openim-admin.loadbalancer.server.port: "80"
+  prometheus:
+    image: prom/prometheus:v3.15.0
+    container_name: openim-prometheus
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=15d
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks: [existing]
+  grafana:
+    image: grafana/grafana:13.2.3
+    container_name: openim-grafana
+    restart: unless-stopped
+    env_file: ../secrets/grafana.env
+    environment:
+      GF_SERVER_ROOT_URL: https://admin.99chat99.com/grafana/
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+      GF_SECURITY_ALLOW_EMBEDDING: "true"
+      GF_SECURITY_COOKIE_SECURE: "true"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/dashboards:/var/lib/grafana/dashboards:ro
+    networks: [existing]
 networks:
   existing:
     external: true
     name: 99chat_default
+volumes:
+  prometheus-data:
+  grafana-data:
