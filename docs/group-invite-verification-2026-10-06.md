@@ -14,3 +14,7 @@
 cd 99chat
 E2E_BASE=http://127.0.0.1:5213 E2E_IM_API=https://999.99chat99.com/api E2E_WS=wss://999.99chat99.com/ws TEST_FIXTURES=/tmp/99chat-friend-live.json node group_invite_e2e.cjs
 ```
+
+线上部署完成：功能提交 baa0ee4 已推送 origin/main，服务器拉取后仅重建 web。Nginx 配置检查通过，页面实际加载 index-BSi-MB7Q.js；原生服务保持 99chat/openim-server:history-7a38dd0 且 healthy。旧 web 镜像已保存为 chat-project-web:before-group-invite-baa0ee4。
+
+使用 E2E_BASE=https://999.99chat99.com 对线上页面再次运行同一测试，群管理和聊天页两个入口均通过上述全部验证。此验证覆盖群主邀请，未声称覆盖普通成员审批或自定义被邀请人确认。
