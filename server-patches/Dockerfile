@@ -15,8 +15,14 @@ RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache
     GOMAXPROCS=2 CGO_ENABLED=0 go build -p 2 -o /out/openim-rpc-auth ./cmd/openim-rpc/openim-rpc-auth && \
     GOMAXPROCS=2 CGO_ENABLED=0 go build -p 2 -o /out/openim-msggateway ./cmd/openim-msggateway
 
+COPY message-history.patch /tmp/message-history.patch
+RUN git apply --check /tmp/message-history.patch && git apply /tmp/message-history.patch
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+    GOMAXPROCS=2 CGO_ENABLED=0 go build -p 2 -o /out/openim-rpc-msg ./cmd/openim-rpc/openim-rpc-msg
+
 FROM openim/openim-server:v3.8.3-patch.15
 ARG TARGETARCH
 COPY --from=builder /out/openim-rpc-group /openim-server/_output/bin/platforms/linux/${TARGETARCH}/openim-rpc-group
 COPY --from=builder /out/openim-rpc-auth /openim-server/_output/bin/platforms/linux/${TARGETARCH}/openim-rpc-auth
 COPY --from=builder /out/openim-msggateway /openim-server/_output/bin/platforms/linux/${TARGETARCH}/openim-msggateway
+COPY --from=builder /out/openim-rpc-msg /openim-server/_output/bin/platforms/linux/${TARGETARCH}/openim-rpc-msg

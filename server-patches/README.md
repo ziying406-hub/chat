@@ -85,3 +85,26 @@ TEST_FIXTURES=/tmp/99chat-friend-local.json node friend_delete_e2e.cjs
 
 测试先成功发送以预热校验缓存，再删除好友，断言原生 SDK 发送返回 1303；
 重新添加后确认成功送达，并重新登录接收账号检查被拒绝消息没有进入历史记录。
+
+## 新浏览器恢复本人群历史
+
+`message-history.patch` 修复原生 GetLastMessage：按调用用户的 `del_list` 过滤消息，
+从最新含有本人可见消息的文档中选择最大 seq。本人删除最近消息后，SDK 首次同步
+能取得更早的有效消息初始化会话；其他成员仍取得自己的最新消息，不会恢复本人已删记录。
+沿用 v3.8.3-patch.15、原生删除标记和协议，仅增加替换 `openim-rpc-msg`，无数据库迁移。
+
+MongoDB 集成测试覆盖跨文档连续删除、其他用户保持最新消息、全部删除后无结果。
+将 `message_history_mongo_test.go` 复制到同版本源码的 `pkg/common/storage/database/mgo/`，
+应用补丁后，用独立测试 MongoDB 执行（不要指向生产数据库）：
+
+```sh
+OPENIM_TEST_MONGO_URI=mongodb://127.0.0.1:<测试端口> go test ./pkg/common/storage/database/mgo -run '^TestLatestVisibleMessage$' -count=1 -v
+```
+
+网页同时将同步结束标记交给原生 `OnSyncServerFinish`，不会在登录返回时提前加载空历史。
+浏览器回归复用已经授权的独立账号和群：
+
+```sh
+cd 99chat
+E2E_BASE=https://<部署域名> TEST_FIXTURES=<私有账号文件> TEST_GROUP_FIXTURE=<私有测试群文件> node group_history_e2e.cjs
+```

@@ -456,9 +456,10 @@ export const useAppStore = create<AppState>()(
         set((s) => { s.isAuthed = true; });
       } catch {
         clearSession();
-        set((s) => { s.authData = null; s.currentUser = null; });
+        set((s) => { s.authData = null; s.currentUser = null; s.isInitialSyncing = false; });
       } finally {
-        set((s) => { s.isInitialSyncing = false; s.isSessionRestoring = false; });
+        // SDK login returns before message sync; OnSyncServerFinish clears its flag.
+        set((s) => { s.isSessionRestoring = false; });
       }
     },
 

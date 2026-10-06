@@ -1,0 +1,60 @@
+diff --git a/pkg/common/storage/controller/msg.go b/pkg/common/storage/controller/msg.go
+index b756b05..2d05d17 100644
+--- a/pkg/common/storage/controller/msg.go
++++ b/pkg/common/storage/controller/msg.go
+@@ -833,7 +833,7 @@ func (db *commonMsgDatabase) GetLastMessage(ctx context.Context, conversationIDs
+ 		if _, ok := res[conversationID]; ok {
+ 			continue
+ 		}
+-		msg, err := db.msgDocDatabase.GetLastMessage(ctx, conversationID)
++		msg, err := db.msgDocDatabase.GetLastMessage(ctx, conversationID, userID)
+ 		if err != nil {
+ 			if errs.Unwrap(err) == mongo.ErrNoDocuments {
+ 				continue
+diff --git a/pkg/common/storage/database/mgo/msg.go b/pkg/common/storage/database/mgo/msg.go
+index f0665b0..dc8d93c 100644
+--- a/pkg/common/storage/database/mgo/msg.go
++++ b/pkg/common/storage/database/mgo/msg.go
+@@ -998,7 +998,7 @@ func (m *MsgMgo) GetLastMessageSeqByTime(ctx context.Context, conversationID str
+ 	return seq, nil
+ }
+ 
+-func (m *MsgMgo) GetLastMessage(ctx context.Context, conversationID string) (*model.MsgInfoModel, error) {
++func (m *MsgMgo) GetLastMessage(ctx context.Context, conversationID, userID string) (*model.MsgInfoModel, error) {
+ 	pipeline := []bson.M{
+ 		{
+ 			"$match": bson.M{
+@@ -1009,9 +1009,10 @@ func (m *MsgMgo) GetLastMessage(ctx context.Context, conversationID string) (*mo
+ 		},
+ 		{
+ 			"$match": bson.M{
+-				"msgs.msg.status": bson.M{
+-					"$lt": constant.MsgStatusHasDeleted,
+-				},
++				"msgs": bson.M{"$elemMatch": bson.M{
++					"msg.status": bson.M{"$lt": constant.MsgStatusHasDeleted},
++					"del_list":   bson.M{"$ne": userID},
++				}},
+ 			},
+ 		},
+ 		{
+@@ -1036,6 +1037,7 @@ func (m *MsgMgo) GetLastMessage(ctx context.Context, conversationID string) (*mo
+ 				"msgs.msg.status": bson.M{
+ 					"$lt": constant.MsgStatusHasDeleted,
+ 				},
++				"msgs.del_list": bson.M{"$ne": userID},
+ 			},
+ 		},
+ 		{
+diff --git a/pkg/common/storage/database/msg.go b/pkg/common/storage/database/msg.go
+index e3c4e8e..b4d126a 100644
+--- a/pkg/common/storage/database/msg.go
++++ b/pkg/common/storage/database/msg.go
+@@ -39,6 +39,6 @@ type Msg interface {
+ 	DeleteDoc(ctx context.Context, docID string) error
+ 	GetRandBeforeMsg(ctx context.Context, ts int64, limit int) ([]*model.MsgDocModel, error)
+ 	GetLastMessageSeqByTime(ctx context.Context, conversationID string, time int64) (int64, error)
+-	GetLastMessage(ctx context.Context, conversationID string) (*model.MsgInfoModel, error)
++	GetLastMessage(ctx context.Context, conversationID, userID string) (*model.MsgInfoModel, error)
+ 	FindSeqs(ctx context.Context, conversationID string, seqs []int64) ([]*model.MsgInfoModel, error)
+ }
