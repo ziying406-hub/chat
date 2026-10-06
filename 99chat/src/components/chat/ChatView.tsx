@@ -72,6 +72,7 @@ export default function ChatView() {
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [showContactPicker, setShowContactPicker] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
+  const [inviting, setInviting] = useState(false);
   const [showForward, setShowForward] = useState(false);
   const [forwardMsgData, setForwardMsgData] = useState<any | null>(null);
   const [forwardMergeData, setForwardMergeData] = useState<any[] | null>(null);
@@ -879,15 +880,19 @@ export default function ChatView() {
                   <button
                     key={f.userID}
                     onClick={async () => {
+                      setInviting(true);
                       try {
-                        await inviteToGroup(conv.groupID, [f.userID], "邀请加入群组");
+                        const result = await inviteToGroup(conv.groupID, [f.userID], "邀请加入群组");
                         setShowInvite(false);
-                        showToast("邀请已发送");
-                      } catch {
-                        showToast("邀请失败");
+                        showToast(result === "pending" ? "已提交入群申请，等待群主或管理员审批" : "好友已加入群组");
+                      } catch (error: any) {
+                        showToast(error?.errMsg || error?.message || "邀请失败，请重试");
+                      } finally {
+                        setInviting(false);
                       }
                     }}
-                    className="w-full flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors"
+                    disabled={inviting}
+                    className="w-full flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors disabled:opacity-50"
                   >
                     <img src={f.faceURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${f.userID}`} alt="" className="w-10 h-10 rounded-lg object-cover bg-gray-100" />
                     <div className="text-left">

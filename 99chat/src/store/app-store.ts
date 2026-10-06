@@ -182,7 +182,7 @@ interface AppState {
   refreshGroups: () => Promise<void>;
   loadGroupMembers: (groupID: string) => Promise<void>;
   setGroupInfo: (groupID: string, info: Partial<GroupItem>) => Promise<void>;
-  inviteToGroup: (groupID: string, userIDs: string[], reason: string) => Promise<void>;
+  inviteToGroup: (groupID: string, userIDs: string[], reason: string) => Promise<"joined" | "pending">;
   kickFromGroup: (groupID: string, userIDs: string[], reason: string) => Promise<void>;
   muteGroupMember: (groupID: string, userID: string, seconds: number) => Promise<void>;
   muteGroup: (groupID: string, isMute: boolean) => Promise<void>;
@@ -1191,9 +1191,12 @@ export const useAppStore = create<AppState>()(
     },
 
     inviteToGroup: async (groupID, userIDs, reason) => {
-      requireGroupPermission(groupID, "invite");
-      const result = await getIMSDK().inviteUserToGroup({ groupID, userIDList: userIDs, reason } as any);
+      const permissions = requireGroupPermission(groupID, "invite");
+      const result = await getIMSDK().inviteUserToGroup({ groupID, userIDList: userIDs, reason });
       if (result.errCode !== 0) throw new Error(result.errMsg || "邀请失败");
+      await get().loadGroupMembers(groupID);
+      const group = get().groups.find((item) => item.groupID === groupID);
+      return group?.needVerification === 1 && !permissions.canManage ? "pending" : "joined";
     },
 
     kickFromGroup: async (groupID, userIDs, reason) => {

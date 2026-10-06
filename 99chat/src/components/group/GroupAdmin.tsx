@@ -16,6 +16,7 @@ export default function GroupAdmin() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const groups = useAppStore((s) => s.groups);
+  const friends = useAppStore((s) => s.friends);
   const members = useAppStore((s) => (id ? s.groupMembersMap[id] : undefined)) || [];
   const loadMembers = useAppStore((s) => s.loadGroupMembers);
   const currentUser = useAppStore((s) => s.currentUser);
@@ -39,6 +40,9 @@ export default function GroupAdmin() {
   const [announcement, setAnnouncement] = useState("");
   const [intro, setIntro] = useState("");
   const [showInvite, setShowInvite] = useState(false);
+  const [inviting, setInviting] = useState(false);
+  const [inviteError, setInviteError] = useState("");
+  const [inviteNotice, setInviteNotice] = useState("");
   const [updatingGroupMute, setUpdatingGroupMute] = useState(false);
   const [memberKeyword, setMemberKeyword] = useState("");
   const [memberResults, setMemberResults] = useState<typeof members | null>(null);
@@ -71,6 +75,7 @@ export default function GroupAdmin() {
 
   if (!group) return <UnavailableDetail to="/contact/groups" label="返回群组列表">群组不存在</UnavailableDetail>;
 
+  const inviteCandidates = friends.filter((friend) => !members.some((member) => member.userID === friend.userID));
   const sorted = [...members].sort((a, b) => (b.roleLevel || 0) - (a.roleLevel || 0));
   const admins = sorted.filter((m) => m.roleLevel >= GroupMemberRole.Admin);
   const pendingApps = groupRequests.filter((r: any) => r.groupID === id);
@@ -198,7 +203,7 @@ export default function GroupAdmin() {
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-500">群成员（{members.length}）</span>
                 {canInvite && (
-                  <button onClick={() => setShowInvite(true)} className="text-sm text-primary-500 flex items-center gap-1"><UserPlus size={16} /> 邀请</button>
+                  <button onClick={() => { setInviteError(""); setInviteNotice(""); setShowInvite(true); }} className="text-sm text-primary-500 flex items-center gap-1"><UserPlus size={16} /> 邀请</button>
                 )}
               </div>
               <div className="flex gap-2">
@@ -206,6 +211,7 @@ export default function GroupAdmin() {
                 <button onClick={handleMemberSearch} disabled={searchingMembers} className="px-3 py-2 bg-primary-500 text-white rounded-lg text-sm disabled:opacity-50">{searchingMembers ? "搜索中" : "搜索"}</button>
               </div>
             </div>
+            {inviteNotice && <p role="status" className="px-5 py-2 text-sm text-primary-500">{inviteNotice}</p>}
             {visibleMembers.map((m) => (
               <div key={m.userID} className="flex items-center gap-3 px-5 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors">
                 <img src={m.faceURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${m.userID}`} alt="" className="w-10 h-10 rounded-xl object-cover bg-gray-100" />
@@ -335,25 +341,36 @@ export default function GroupAdmin() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setShowInvite(false)}>
           <div className="bg-white rounded-2xl p-6 w-80" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-base font-semibold text-gray-800 mb-3">邀请好友</h3>
-            <p className="text-sm text-gray-400 mb-4">从好友列表中选择要邀请的成员</p>
+            <p className="text-sm text-gray-400 mb-4">群主和管理员邀请直接入群；需审批的成员邀请交由群管理员处理</p>
             <div className="max-h-60 overflow-y-auto space-y-1">
-              {useAppStore.getState().friends.map((f) => (
+              {inviteCandidates.length === 0 && <p className="py-4 text-sm text-gray-400">暂无可邀请的好友</p>}
+              {inviteCandidates.map((f) => (
                 <button
                   key={f.userID}
                   onClick={async () => {
                     if (!id) return;
                     if (!confirm(`邀请 ${f.nickname || f.userID} 加入群组？`)) return;
-                    await inviteToGroup(id, [f.userID], "邀请加入群组");
-                    setShowInvite(false);
-                    await loadMembers(id);
+                    setInviteError("");
+                    setInviting(true);
+                    try {
+                      const result = await inviteToGroup(id, [f.userID], "邀请加入群组");
+                      setInviteNotice(result === "pending" ? "已提交入群申请，等待群主或管理员审批" : "好友已加入群组");
+                      setShowInvite(false);
+                    } catch (error: any) {
+                      setInviteError(error?.errMsg || error?.message || "邀请失败，请重试");
+                    } finally {
+                      setInviting(false);
+                    }
                   }}
-                  className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+                  disabled={inviting}
+                  className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
                 >
                   <img src={f.faceURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${f.userID}`} alt="" className="w-8 h-8 rounded-lg object-cover bg-gray-100" />
                   <span className="text-sm text-gray-700">{f.remark || f.nickname || f.userID}</span>
                 </button>
               ))}
             </div>
+            {inviteError && <p role="alert" className="mt-3 text-sm text-red-500">{inviteError}</p>}
             <button onClick={() => setShowInvite(false)} className="w-full mt-4 py-2 bg-gray-50 text-gray-500 rounded-lg text-sm hover:bg-gray-100">取消</button>
           </div>
         </div>
