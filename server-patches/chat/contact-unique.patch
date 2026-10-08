@@ -1,5 +1,5 @@
 diff --git a/internal/api/chat/chat.go b/internal/api/chat/chat.go
-index b4b1d1e..9207b70 100644
+index b4b1d1e..891cb59 100644
 --- a/internal/api/chat/chat.go
 +++ b/internal/api/chat/chat.go
 @@ -15,7 +15,9 @@
@@ -51,10 +51,10 @@ index b4b1d1e..9207b70 100644
  	ip, err := o.GetClientIP(c)
  	if err != nil {
  		apiresp.GinError(c, err)
-@@ -196,6 +216,13 @@ func (o *Api) RegisterUser(c *gin.Context) {
- 		apiresp.GinError(c, err)
- 		return
+@@ -224,6 +244,13 @@ func (o *Api) RegisterUser(c *gin.Context) {
  	}
+ 	resp.ChatToken = respRegisterUser.ChatToken
+ 	resp.UserID = respRegisterUser.UserID
 +	if !reservation.IsZero() {
 +		_, err = o.contacts.UpdateOne(c, bson.M{"_id": reservation}, bson.M{"$set": bson.M{"userID": respRegisterUser.UserID}, "$unset": bson.M{"expiresAt": ""}})
 +		if err != nil {
@@ -62,9 +62,9 @@ index b4b1d1e..9207b70 100644
 +			return
 +		}
 +	}
- 	userInfo := &sdkws.UserInfo{
- 		UserID:     respRegisterUser.UserID,
- 		Nickname:   req.User.Nickname,
+ 	apiresp.GinSuccess(c, &resp)
+ }
+ 
 @@ -300,6 +327,10 @@ func (o *Api) UpdateUserInfo(c *gin.Context) {
  		apiresp.GinError(c, err)
  		return

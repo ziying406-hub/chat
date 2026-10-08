@@ -20,9 +20,8 @@ TEST_FIXTURES=/path/to/private-test-accounts.json node server-patches/chat/regis
 cd 99chat && npm run build
 ```
 
-手机号：原生手机号账号已有重复注册检查；邮箱注册界面的可选手机号
-仍为 99chat_contact_profiles 资料，没有唯一约束。这部分是否禁止不同
-邮箱共用手机号，等待用户确认；本补丁不改变手机号资料规则。
+手机号：原生手机号账号已有重复注册检查。用户随后确认选填手机号
+也必须唯一，已通过下文 contact-unique.patch 完成约束。
 
 本次重复注册测试的残留账号 7079307657 已按 user_id 清理 attribute、
 account、register 三条记录，无 credential 或 OpenIM user，未触及正式账号。
@@ -47,7 +46,7 @@ contact-unique.patch 在 99chat_contact_profiles 上增加区号和手机号的
 部分唯一索引（排除空号码）。原资料保留，补充 userID 查询字段；
 GetContact / SaveContact 使用该字段查询。
 
-注册 API 增加 contact 字段。填写手机号时先原子占用号码，RPC 注册
+注册 API 增加 contact 字段。填写手机号时先原子占用号码，账号注册及登录令牌获取
 成功后绑定实际 userID；注册失败释放占用。15 分钟 TTL 只清理进程
 异常退出时留下的未完成占用，已完成记录不设过期时间。
 原生手机号账号通过 CheckUserExist 同样排除占用。
@@ -65,3 +64,15 @@ PHONE_TEST_FIXTURE=/path/to/private-phone-account.json \
 TEST_CODE_READER=/path/to/private-test-code-reader \
 node server-patches/chat/contact-unique-api-test.mjs
 ```
+
+### 选填手机号线上验证（2026-10-08）
+
+- 当前 Chat 镜像：99chat/openim-chat:unique-phone-20261008-v3。
+- 配置备份：/opt/openim/docker-compose-custom.yml.before-unique-phone-20261008。
+- 现有 6 条手机号资料无重复，保留原字段并补充 userID；唯一索引成功启用。
+- 独立账号注册并保存手机号成功；新邮箱复用、+086 绕过、原生 user.phoneNumber
+  输入复用以及其他账号资料修改均返回 20003。自己的号码可以重复保存。
+- 并发失败请求及重试达到验证码校验，失败后没有残留占用。
+- Mongo 直接重复写入被唯一索引拒绝；号码只有一个所属账号，被拒邮箱账号数为 0。
+- Ego 真实点击新邮箱注册，页面显示“该手机号已注册”。
+- 原邮箱重复注册回归、Go 测试与前端生产构建通过。
