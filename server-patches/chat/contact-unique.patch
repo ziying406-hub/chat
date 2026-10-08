@@ -1,0 +1,214 @@
+diff --git a/internal/api/chat/chat.go b/internal/api/chat/chat.go
+index b4b1d1e..9207b70 100644
+--- a/internal/api/chat/chat.go
++++ b/internal/api/chat/chat.go
+@@ -15,7 +15,9 @@
+ package chat
+ 
+ import (
++	"context"
+ 	"io"
++	"strings"
+ 	"time"
+ 
+ 	"github.com/openimsdk/chat/internal/api/util"
+@@ -33,6 +35,7 @@ import (
+ 	"github.com/openimsdk/tools/errs"
+ 	"github.com/openimsdk/tools/log"
+ 	"go.mongodb.org/mongo-driver/bson"
++	"go.mongodb.org/mongo-driver/bson/primitive"
+ 	"go.mongodb.org/mongo-driver/mongo"
+ 	"go.mongodb.org/mongo-driver/mongo/options"
+ )
+@@ -148,11 +151,28 @@ func (o *Api) VerifyCode(c *gin.Context) {
+ }
+ 
+ func (o *Api) RegisterUser(c *gin.Context) {
+-	req, err := a2r.ParseRequest[chatpb.RegisterUserReq](c)
+-	if err != nil {
++	var request struct {
++		chatpb.RegisterUserReq
++		Contact *contactProfile `json:"contact"`
++	}
++	if err := c.ShouldBindJSON(&request); err != nil {
+ 		apiresp.GinError(c, err)
+ 		return
+ 	}
++	req := &request.RegisterUserReq
++	if req.User != nil && req.User.PhoneNumber != "" {
++		request.Contact = &contactProfile{AreaCode: req.User.AreaCode, PhoneNumber: req.User.PhoneNumber}
++	}
++	var reservation primitive.ObjectID
++	if request.Contact != nil && strings.TrimSpace(request.Contact.PhoneNumber) != "" {
++		var err error
++		reservation, err = o.reserveContact(c, *request.Contact)
++		if err != nil {
++			apiresp.GinError(c, err)
++			return
++		}
++		defer o.contacts.DeleteOne(context.WithoutCancel(c), bson.M{"_id": reservation, "userID": ""})
++	}
+ 	ip, err := o.GetClientIP(c)
+ 	if err != nil {
+ 		apiresp.GinError(c, err)
+@@ -196,6 +216,13 @@ func (o *Api) RegisterUser(c *gin.Context) {
+ 		apiresp.GinError(c, err)
+ 		return
+ 	}
++	if !reservation.IsZero() {
++		_, err = o.contacts.UpdateOne(c, bson.M{"_id": reservation}, bson.M{"$set": bson.M{"userID": respRegisterUser.UserID}, "$unset": bson.M{"expiresAt": ""}})
++		if err != nil {
++			apiresp.GinError(c, err)
++			return
++		}
++	}
+ 	userInfo := &sdkws.UserInfo{
+ 		UserID:     respRegisterUser.UserID,
+ 		Nickname:   req.User.Nickname,
+@@ -300,6 +327,10 @@ func (o *Api) UpdateUserInfo(c *gin.Context) {
+ 		apiresp.GinError(c, err)
+ 		return
+ 	}
++	if req.PhoneNumber != nil || req.AreaCode != nil {
++		apiresp.GinError(c, errs.ErrArgs.WrapMsg("Use /user/contact/save to update phone number"))
++		return
++	}
+ 	if req.Email != nil {
+ 		apiresp.GinError(c, errs.ErrArgs.WrapMsg("Use /user/email/bind with an email verification code"))
+ 		return
+diff --git a/internal/api/chat/contact.go b/internal/api/chat/contact.go
+index 0d5d5bc..a58e646 100644
+--- a/internal/api/chat/contact.go
++++ b/internal/api/chat/contact.go
+@@ -1,18 +1,23 @@
+ package chat
+ 
+ import (
++	"context"
+ 	"errors"
+ 	"net/mail"
+ 	"regexp"
++	"strconv"
+ 	"strings"
++	"time"
+ 
+ 	"github.com/gin-gonic/gin"
+ 	"github.com/openimsdk/chat/pkg/common/mctx"
++	"github.com/openimsdk/chat/pkg/eerrs"
+ 	chatpb "github.com/openimsdk/chat/pkg/protocol/chat"
+ 	"github.com/openimsdk/protocol/wrapperspb"
+ 	"github.com/openimsdk/tools/apiresp"
+ 	"github.com/openimsdk/tools/errs"
+ 	"go.mongodb.org/mongo-driver/bson"
++	"go.mongodb.org/mongo-driver/bson/primitive"
+ 	"go.mongodb.org/mongo-driver/mongo"
+ 	"go.mongodb.org/mongo-driver/mongo/options"
+ )
+@@ -35,7 +40,7 @@ func (o *Api) GetContact(c *gin.Context) {
+ 		return
+ 	}
+ 	var profile contactProfile
+-	err = o.contacts.FindOne(c, bson.M{"_id": userID}).Decode(&profile)
++	err = o.contacts.FindOne(c, bson.M{"userID": userID}).Decode(&profile)
+ 	if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
+ 		apiresp.GinError(c, err)
+ 		return
+@@ -52,11 +57,23 @@ func (o *Api) GetContact(c *gin.Context) {
+ 
+ func (o *Api) SaveContact(c *gin.Context) {
+ 	var profile contactProfile
+-	if err := c.ShouldBindJSON(&profile); err != nil || !areaPattern.MatchString(profile.AreaCode) || (profile.PhoneNumber != "" && !phonePattern.MatchString(profile.PhoneNumber)) {
++	if err := c.ShouldBindJSON(&profile); err != nil {
++		apiresp.GinError(c, errs.ErrArgs)
++		return
++	}
++	if err := normalizeContact(&profile); err != nil {
+ 		apiresp.GinError(c, errs.ErrArgs.WrapMsg("Invalid phone number or area code"))
+ 		return
+ 	}
+-	_, err := o.contacts.UpdateOne(c, bson.M{"_id": mctx.GetOpUserID(c)}, bson.M{"$set": profile}, options.Update().SetUpsert(true))
++	userID := mctx.GetOpUserID(c)
++	if err := o.checkNativePhone(c, profile, userID); err != nil {
++		apiresp.GinError(c, err)
++		return
++	}
++	_, err := o.contacts.UpdateOne(c, bson.M{"userID": userID}, bson.M{"$set": bson.M{"userID": userID, "areaCode": profile.AreaCode, "phoneNumber": profile.PhoneNumber}}, options.Update().SetUpsert(true))
++	if mongo.IsDuplicateKeyError(err) {
++		err = eerrs.ErrPhoneAlreadyRegister.Wrap()
++	}
+ 	if err != nil {
+ 		apiresp.GinError(c, err)
+ 		return
+@@ -90,3 +107,58 @@ func (o *Api) BindEmail(c *gin.Context) {
+ 	}
+ 	apiresp.GinSuccess(c, nil)
+ }
++
++// Pending registrations reserve a phone before creating an account. Failed requests
++// release it; the TTL only recovers reservations if the process stops unexpectedly.
++func (o *Api) initContactIndexes(ctx context.Context) error {
++	_, err := o.contacts.UpdateMany(ctx, bson.M{"userID": bson.M{"$exists": false}}, mongo.Pipeline{{{Key: "$set", Value: bson.M{"userID": "$_id"}}}})
++	if err != nil {
++		return err
++	}
++	_, err = o.contacts.Indexes().CreateMany(ctx, []mongo.IndexModel{
++		{Keys: bson.D{{Key: "userID", Value: 1}}, Options: options.Index().SetUnique(true).SetPartialFilterExpression(bson.M{"userID": bson.M{"$gt": ""}})},
++		{Keys: bson.D{{Key: "areaCode", Value: 1}, {Key: "phoneNumber", Value: 1}}, Options: options.Index().SetUnique(true).SetPartialFilterExpression(bson.M{"phoneNumber": bson.M{"$gt": ""}})},
++		{Keys: bson.D{{Key: "expiresAt", Value: 1}}, Options: options.Index().SetExpireAfterSeconds(0)},
++	})
++	return err
++}
++
++func normalizeContact(profile *contactProfile) error {
++	profile.PhoneNumber = strings.TrimSpace(profile.PhoneNumber)
++	profile.AreaCode = strings.TrimSpace(profile.AreaCode)
++	if !areaPattern.MatchString(profile.AreaCode) || (profile.PhoneNumber != "" && !phonePattern.MatchString(profile.PhoneNumber)) {
++		return errs.ErrArgs.WrapMsg("Invalid phone number or area code")
++	}
++	code, _ := strconv.Atoi(profile.AreaCode[1:])
++	profile.AreaCode = "+" + strconv.Itoa(code)
++	return nil
++}
++
++func (o *Api) checkNativePhone(ctx context.Context, profile contactProfile, userID string) error {
++	if profile.PhoneNumber == "" {
++		return nil
++	}
++	resp, err := o.chatClient.CheckUserExist(ctx, &chatpb.CheckUserExistReq{User: &chatpb.RegisterUserInfo{AreaCode: profile.AreaCode, PhoneNumber: profile.PhoneNumber}})
++	if err != nil {
++		return err
++	}
++	if resp.IsRegistered && resp.Userid != userID {
++		return eerrs.ErrPhoneAlreadyRegister.Wrap()
++	}
++	return nil
++}
++
++func (o *Api) reserveContact(ctx context.Context, profile contactProfile) (primitive.ObjectID, error) {
++	if err := normalizeContact(&profile); err != nil {
++		return primitive.NilObjectID, err
++	}
++	if err := o.checkNativePhone(ctx, profile, ""); err != nil {
++		return primitive.NilObjectID, err
++	}
++	id := primitive.NewObjectID()
++	_, err := o.contacts.InsertOne(ctx, bson.M{"_id": id, "userID": "", "areaCode": profile.AreaCode, "phoneNumber": profile.PhoneNumber, "expiresAt": time.Now().Add(15 * time.Minute)})
++	if mongo.IsDuplicateKeyError(err) {
++		err = eerrs.ErrPhoneAlreadyRegister.Wrap()
++	}
++	return id, err
++}
+diff --git a/internal/api/chat/start.go b/internal/api/chat/start.go
+index 3e3f995..14b548e 100644
+--- a/internal/api/chat/start.go
++++ b/internal/api/chat/start.go
+@@ -85,6 +85,9 @@ func Start(ctx context.Context, index int, cfg *Config) error {
+ 		return err
+ 	}
+ 	adminApi := New(chatClient, adminClient, im, &base, mongoClient.GetDB())
++	if err := adminApi.initContactIndexes(ctx); err != nil {
++		return err
++	}
+ 	mwApi := chatmw.New(adminClient)
+ 	gin.SetMode(gin.ReleaseMode)
+ 	engine := gin.New()

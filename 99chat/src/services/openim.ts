@@ -75,6 +75,7 @@ export async function registerUser(params: {
       verifyCode: params.verifyCode,
       platform: PLATFORM_ID,
       autoLogin: true,
+      ...(params.email && params.phoneNumber ? { contact: { phoneNumber: params.phoneNumber, areaCode: params.areaCode || "+86" } } : {}),
       user: {
         nickname: params.nickname,
         ...(params.email ? { email: params.email } : { areaCode: params.areaCode || "+86", phoneNumber: params.phoneNumber }),
@@ -87,13 +88,6 @@ export async function registerUser(params: {
     const message = data.errCode === 20014 ? "该邮箱已注册，请直接登录或找回密码"
       : data.errCode === 20003 ? "该手机号已注册" : data.errMsg || "注册失败";
     throw new Error(message);
-  }
-  if (params.email && params.phoneNumber) {
-    try {
-      await saveContactProfile(data.data.chatToken, { phoneNumber: params.phoneNumber, areaCode: params.areaCode || "+86" });
-    } catch {
-      throw new Error("账号已创建，但手机号保存失败。请用邮箱登录后在个人资料中重试。");
-    }
   }
   return data.data;
 }
@@ -221,7 +215,7 @@ async function profileRequest(path: string, token: string, body: object) {
     body: JSON.stringify(body),
   });
   const data = await res.json();
-  if (data.errCode !== 0) throw new Error(data.errMsg || "保存账号资料失败");
+  if (data.errCode !== 0) throw new Error(data.errCode === 20003 ? "该手机号已被其他账号使用" : data.errMsg || "保存账号资料失败");
   return data.data;
 }
 export async function getAccountProfile(token: string): Promise<AccountProfile> {

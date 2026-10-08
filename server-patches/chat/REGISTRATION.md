@@ -39,3 +39,29 @@ account、register 三条记录，无 credential 或 OpenIM user，未触及正�
 
 回滚：恢复上述 Compose 备份并仅重建 openim-chat；前端可使用镜像
 chat-project-web:before-registration-5ee10a5，不删除任何数据卷。
+
+## 选填手机号唯一性
+
+用户确认：换邮箱注册时，也不能填写相同手机号。
+contact-unique.patch 在 99chat_contact_profiles 上增加区号和手机号的
+部分唯一索引（排除空号码）。原资料保留，补充 userID 查询字段；
+GetContact / SaveContact 使用该字段查询。
+
+注册 API 增加 contact 字段。填写手机号时先原子占用号码，RPC 注册
+成功后绑定实际 userID；注册失败释放占用。15 分钟 TTL 只清理进程
+异常退出时留下的未完成占用，已完成记录不设过期时间。
+原生手机号账号通过 CheckUserExist 同样排除占用。
+个人资料保存也执行唯一约束，且普通 /user/update 不再允许绕过该路径
+修改手机号。空手机号仍可不填；原账号重复保存自己的号码允许。
+
+前端将选填手机号随注册一起提交，取消注册成功后另存手机号的步骤。
+相同号码按区号区分，区号会去掉多余前导零（+086 与 +86 相同）。
+
+独立生产测试（会创建一个测试账号并发送一封验证码）：
+
+```sh
+TEST_FIXTURES=/path/to/private-accounts.json \
+PHONE_TEST_FIXTURE=/path/to/private-phone-account.json \
+TEST_CODE_READER=/path/to/private-test-code-reader \
+node server-patches/chat/contact-unique-api-test.mjs
+```
