@@ -6,11 +6,15 @@ RUN git init && git remote add origin https://github.com/openimsdk/chat.git \
     && git checkout --detach FETCH_HEAD
 COPY favorites.patch /tmp/favorites.patch
 COPY email-auth.patch /tmp/email-auth.patch
+COPY registration.patch /tmp/registration.patch
 RUN git apply --check /tmp/favorites.patch && git apply /tmp/favorites.patch
 RUN git apply --check /tmp/email-auth.patch && git apply /tmp/email-auth.patch
+RUN git apply --check /tmp/registration.patch && git apply /tmp/registration.patch
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
-    GOMAXPROCS=2 CGO_ENABLED=0 go build -p 2 -o /out/chat-api ./cmd/api/chat-api
+    GOMAXPROCS=2 CGO_ENABLED=0 go build -p 2 -o /out/chat-api ./cmd/api/chat-api \
+    && GOMAXPROCS=2 CGO_ENABLED=0 go build -p 2 -o /out/chat-rpc ./cmd/rpc/chat-rpc
 
 FROM openim/openim-chat:v1.8.4-patch.5
 ARG TARGETARCH
 COPY --from=builder /out/chat-api /openim-chat/_output/bin/platforms/linux/${TARGETARCH}/chat-api
+COPY --from=builder /out/chat-rpc /openim-chat/_output/bin/platforms/linux/${TARGETARCH}/chat-rpc

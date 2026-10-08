@@ -1,0 +1,75 @@
+diff --git a/internal/rpc/chat/user.go b/internal/rpc/chat/user.go
+index c3fc234..f137f23 100644
+--- a/internal/rpc/chat/user.go
++++ b/internal/rpc/chat/user.go
+@@ -417,7 +417,7 @@ func (o *chatSvr) CheckUserExist(ctx context.Context, req *chat.CheckUserExistRe
+ 		}
+ 	}
+ 	if req.User.Email != "" {
+-		account, err := o.Database.TakeCredentialByAccount(ctx, req.User.AreaCode)
++		account, err := o.Database.TakeCredentialByAccount(ctx, req.User.Email)
+ 		if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
+ 			return nil, err
+ 		}
+diff --git a/internal/rpc/chat/utils.go b/internal/rpc/chat/utils.go
+index 41ebd1b..10e68bd 100644
+--- a/internal/rpc/chat/utils.go
++++ b/internal/rpc/chat/utils.go
+@@ -101,7 +101,7 @@ func (o *chatSvr) checkRegisterInfo(ctx context.Context, user *chat.RegisterUser
+ 		if !stringutil.IsValidEmail(user.Email) {
+ 			return errs.ErrArgs.WrapMsg("invalid email")
+ 		}
+-		_, err := o.Database.TakeAttributeByAccount(ctx, user.Email)
++		_, err := o.Database.TakeAttributeByEmail(ctx, user.Email)
+ 		if err == nil {
+ 			return eerrs.ErrEmailAlreadyRegister.Wrap()
+ 		} else if !dbutil.IsDBNotFound(err) {
+diff --git a/internal/rpc/chat/registration_test.go b/internal/rpc/chat/registration_test.go
+new file mode 100644
+index 0000000..8ac4b46
+--- /dev/null
++++ b/internal/rpc/chat/registration_test.go
+@@ -0,0 +1,43 @@
++package chat
++
++import (
++	"context"
++	"github.com/openimsdk/chat/pkg/common/db/database"
++	table "github.com/openimsdk/chat/pkg/common/db/table/chat"
++	"github.com/openimsdk/chat/pkg/protocol/chat"
++	"testing"
++)
++
++type duplicateEmailDB struct {
++	database.ChatDatabaseInterface
++	t     *testing.T
++	email string
++}
++
++func (d duplicateEmailDB) TakeAttributeByEmail(_ context.Context, email string) (*table.Attribute, error) {
++	if email != d.email {
++		d.t.Fatalf("wrong email lookup: %q", email)
++	}
++	return &table.Attribute{UserID: "existing-user", Email: email}, nil
++}
++func (d duplicateEmailDB) TakeCredentialByAccount(_ context.Context, account string) (*table.Credential, error) {
++	if account != d.email {
++		d.t.Fatalf("wrong credential lookup: %q", account)
++	}
++	return &table.Credential{UserID: "existing-user", Account: account}, nil
++}
++func TestDuplicateEmailRejectedBeforeVerification(t *testing.T) {
++	email := "existing@example.com"
++	s := chatSvr{Database: duplicateEmailDB{t: t, email: email}}
++	if err := s.checkRegisterInfo(context.Background(), &chat.RegisterUserInfo{Email: email}, false); err == nil {
++		t.Fatal("duplicate email was accepted")
++	}
++}
++func TestExistingEmailCredentialLookup(t *testing.T) {
++	email := "existing@example.com"
++	s := chatSvr{Database: duplicateEmailDB{t: t, email: email}}
++	r, err := s.CheckUserExist(context.Background(), &chat.CheckUserExistReq{User: &chat.RegisterUserInfo{Email: email}})
++	if err != nil || r == nil || !r.IsRegistered || r.Userid != "existing-user" {
++		t.Fatalf("existing email not detected: %v, %v", r, err)
++	}
++}

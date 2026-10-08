@@ -83,7 +83,11 @@ export async function registerUser(params: {
     }),
   });
   const data = await res.json();
-  if (data.errCode !== 0) throw new Error(data.errMsg || "注册失败");
+  if (data.errCode !== 0) {
+    const message = data.errCode === 20014 ? "该邮箱已注册，请直接登录或找回密码"
+      : data.errCode === 20003 ? "该手机号已注册" : data.errMsg || "注册失败";
+    throw new Error(message);
+  }
   if (params.email && params.phoneNumber) {
     try {
       await saveContactProfile(data.data.chatToken, { phoneNumber: params.phoneNumber, areaCode: params.areaCode || "+86" });
