@@ -20,6 +20,12 @@ class EmailPatchTest(unittest.TestCase):
         self.assertIn('"/user/import/json"', updated)
         with self.assertRaises(ValueError):
             patch.add_email(updated)
+        batch = patch.add_batch(updated)
+        self.assertIn('window.AdminBatchUsers', batch)
+        self.assertIn('"/account/register"', batch)
+        self.assertIn('headers:{isAccount:!0}', batch)
+        with self.assertRaises(ValueError):
+            patch.add_batch(batch)
 
 
 if __name__ == '__main__':

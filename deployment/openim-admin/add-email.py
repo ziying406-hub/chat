@@ -13,11 +13,19 @@ def add_email(source):
     return source.replace(payload, 'phoneNumber:t.phoneNumber,email:t.email,password:k()(t.password)').replace(password_field, email_field + password_field)
 
 
+def add_batch(source):
+    toolbar = '},"key")],settings:[]'
+    if source.count(toolbar) != 1:
+        raise ValueError('Official admin user toolbar changed')
+    batch = '},"key"),(0,n.jsx)(window.AdminBatchUsers,{React:h,createUser:function(user){return(0,P.request)("/account/register",{method:"POST",data:{user:Object.assign({},user,{password:k()(user.password)}),platform:10,autoLogin:!1},headers:{isAccount:!0},baseURL:r(92762).bt})},reload:T},"batch")],settings:[]'
+    return source.replace(toolbar, batch)
+
+
 if __name__ == '__main__':
     root = Path(sys.argv[1])
-    version = 'email-20261008-v2'
+    version = 'batch-20261008-v3'
     original = root / 'p__chat__user__UserList__index.51e9cb92.async.js'
-    (root / f'p__chat__user__UserList__index.{version}.async.js').write_text(add_email(original.read_text()))
+    (root / f'p__chat__user__UserList__index.{version}.async.js').write_text(add_batch(add_email(original.read_text())))
     runtime = (root / 'umi.8cd017f3.js').read_text()
     if runtime.count('92:"51e9cb92"') != 1:
         raise ValueError('Official admin chunk map changed')
@@ -28,4 +36,5 @@ if __name__ == '__main__':
     index = root / 'index.html'
     if index.read_text().count('/umi.8cd017f3.js') != 1:
         raise ValueError('Official admin entry script changed')
-    index.write_text(index.read_text().replace('/umi.8cd017f3.js', f'/umi.{version}.js'))
+    assets = f'<link rel="stylesheet" href="/batch-users.{version}.css"><script src="/batch-users.{version}.js"></script>'
+    index.write_text(index.read_text().replace('<script src="/umi.8cd017f3.js">', assets + f'<script src="/umi.{version}.js">'))

@@ -1,0 +1,17 @@
+.admin-batch-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 1100; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.admin-batch-button { display: inline-flex; align-items: center; justify-content: center; height: 32px; padding: 4px 15px; border: 1px solid #d9d9d9; border-radius: 6px; background: #fff; color: rgba(0,0,0,.88); font-size: 14px; cursor: pointer; }
+.admin-batch-button.ant-btn-primary { background: #1677ff; border-color: #1677ff; color: #fff; }
+.admin-batch-button:hover { border-color: #4096ff; }
+.admin-batch-button:disabled { background: #f5f5f5; border-color: #d9d9d9; color: rgba(0,0,0,.25); cursor: not-allowed; }
+.admin-batch-panel { background: #fff; border-radius: 8px; padding: 24px; width: 960px; max-width: 100%; max-height: 90vh; overflow: auto; color: rgba(0,0,0,.88); font-size: 14px; text-align: left; }
+.admin-batch-panel header, .admin-batch-panel footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.admin-batch-panel h2 { font-size: 20px; margin: 0; }
+.admin-batch-panel p { margin: 16px 0; white-space: normal; line-height: 1.6; }
+.admin-batch-panel textarea { display: block; width: 100%; min-height: 140px; margin-top: 8px; padding: 12px; border: 1px solid #d9d9d9; border-radius: 6px; font: inherit; resize: vertical; }
+.admin-batch-panel textarea:focus { outline: 2px solid #91caff; }
+.admin-batch-panel footer { justify-content: flex-end; margin-top: 20px; }
+.admin-batch-error { color: #cf1322; }
+.admin-batch-table { overflow-x: auto; margin-top: 16px; }
+.admin-batch-table table { width: 100%; border-collapse: collapse; }
+.admin-batch-table th, .admin-batch-table td { padding: 10px; border-bottom: 1px solid #f0f0f0; text-align: left; white-space: nowrap; }
+.admin-batch-table th { background: #fafafa; }
