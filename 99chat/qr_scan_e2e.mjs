@@ -29,6 +29,7 @@ if (await p.evaluate(() => !!document.querySelector('input[placeholder="请输�
   await clickText('登录');
 }
 await p.waitForFunction(() => !location.hash.includes('/auth/'), undefined, {timeout:45000});
+assert.equal(await p.evaluate(() => JSON.parse(localStorage.getItem('99chat_session') || 'null')?.userID), users[0].userID, 'Use only the independent test account');
 await p.goto(`${base}/?qr-test=${Date.now()}#/contact/requests`);
 await p.waitForFunction(() => document.body.textContent.includes('扫一扫'), undefined, {timeout:20000});
 if (await p.evaluate(() => document.body.textContent.includes('开启通知，及时收到消息提醒'))) await clickText('拒绝');
@@ -54,6 +55,12 @@ await p.evaluate(async (data) => {
     const canvas = document.createElement('canvas'); canvas.width = canvas.height = 640;
     const ctx = canvas.getContext('2d'); ctx.fillStyle = 'white'; ctx.fillRect(0,0,640,640); if (window.qrTestFeed) ctx.drawImage(image,170,170,300,300);
     const stream = canvas.captureStream(10); window.qrTestTracks.push(...stream.getTracks());
+    // Camera frames continue while the worker loads; a static canvas emits only one frame.
+    const timer = setInterval(() => {
+      if (stream.getTracks().every(t => t.readyState === 'ended')) { clearInterval(timer); return; }
+      ctx.fillRect(0,0,640,640);
+      if (window.qrTestFeed) ctx.drawImage(image,170,170,300,300);
+    }, 100);
     return stream;
   };
 }, `data:image/png;base64,${png.toString('base64')}`);
