@@ -24,6 +24,27 @@ index 41ebd1b..10e68bd 100644
  		if err == nil {
  			return eerrs.ErrEmailAlreadyRegister.Wrap()
  		} else if !dbutil.IsDBNotFound(err) {
+diff --git a/pkg/common/imapi/caller.go b/pkg/common/imapi/caller.go
+index 1e091ec..aa7cf5d 100644
+--- a/pkg/common/imapi/caller.go
++++ b/pkg/common/imapi/caller.go
+@@ -7,7 +7,6 @@ import (
+ 
+ 	"github.com/openimsdk/tools/log"
+ 
+-	"github.com/openimsdk/chat/pkg/eerrs"
+ 	"github.com/openimsdk/protocol/auth"
+ 	"github.com/openimsdk/protocol/constant"
+ 	constantpb "github.com/openimsdk/protocol/constant"
+@@ -187,7 +186,7 @@ func (c *Caller) AccountCheckSingle(ctx context.Context, userID string) (bool, e
+ 		return false, err
+ 	}
+ 	if resp.Results[0].AccountStatus == constant.Registered {
+-		return false, eerrs.ErrAccountAlreadyRegister.Wrap()
++		return false, nil
+ 	}
+ 	return true, nil
+ }
 diff --git a/internal/rpc/chat/registration_test.go b/internal/rpc/chat/registration_test.go
 new file mode 100644
 index 0000000..8ac4b46
@@ -71,5 +92,32 @@ index 0000000..8ac4b46
 +	r, err := s.CheckUserExist(context.Background(), &chat.CheckUserExistReq{User: &chat.RegisterUserInfo{Email: email}})
 +	if err != nil || r == nil || !r.IsRegistered || r.Userid != "existing-user" {
 +		t.Fatalf("existing email not detected: %v, %v", r, err)
++	}
++}
+diff --git a/pkg/common/imapi/registration_test.go b/pkg/common/imapi/registration_test.go
+new file mode 100644
+index 0000000..82a3548
+--- /dev/null
++++ b/pkg/common/imapi/registration_test.go
+@@ -0,0 +1,21 @@
++package imapi
++
++import (
++	"context"
++	"net/http"
++	"net/http/httptest"
++	"testing"
++)
++
++func TestExistingIMAccountIsNotMissing(t *testing.T) {
++	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++		w.Header().Set("Content-Type", "application/json")
++		w.Write([]byte(`{"errCode":0,"data":{"results":[{"userID":"existing-user","accountStatus":1}]}}`))
++	}))
++	defer server.Close()
++	caller := &Caller{imApi: server.URL}
++	missing, err := caller.AccountCheckSingle(context.Background(), "existing-user")
++	if err != nil || missing {
++		t.Fatalf("existing user must return false without error: %v, %v", missing, err)
 +	}
 +}
