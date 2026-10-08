@@ -2,7 +2,7 @@
 
 入口：https://admin.99chat99.com/login
 
-使用官方 `openim/openim-admin-front:release-v1.8.4-patch.2`，与生产 OpenIM Chat v1.8.4-patch.5 配套。部署文件位于服务器 `/opt/openim/admin`。新增管理网页及监控容器，复用外部网络 `99chat_default` 和现有 Chat/IM API，不重建现有服务或数据卷。
+使用基于官方 `openim/openim-admin-front:release-v1.8.4-patch.2` 构建的 `99chat/openim-admin-front:email`，与生产 OpenIM Chat v1.8.4-patch.5 配套。部署文件位于服务器 `/opt/openim/admin`。新增管理网页及监控容器，复用外部网络 `99chat_default` 和现有 Chat/IM API，不重建现有服务或数据卷。
 
 前端在 HTTPS 下使用当前域名的 `/complete_admin`、`/chat`、`/api`，由 Nginx 分别代理到现有管理 API、Chat API、OpenIM API。管理网页业务路由也使用 `/chat`；因此该前缀的 GET 请求返回 SPA，POST 请求代理到 Chat API，以保证用户列表直接访问及刷新正常。Traefik 使用独立 Host 规则和现有 letsencrypt resolver 提供 HTTPS。
 
@@ -11,6 +11,7 @@
 ```sh
 cd /opt/openim/admin
 docker compose -f compose.yml config --quiet
+docker compose -f compose.yml build admin
 docker compose -f compose.yml up -d
 docker exec openim-admin-front nginx -t
 ```
@@ -24,6 +25,16 @@ ADMIN_ACCESS_FILE=<私有登录凭据JSON> node deployment/openim-admin/test.mjs
 ```
 
 JSON 包含 url、account、password。测试验证 HTTPS 页面、未登录访问拒绝、原生管理员登录与资料读取，以及现有用户和群组列表。不会发送消息、修改用户或群组。
+
+## 创建用户邮箱
+
+创建新用户弹窗新增选填邮箱，保留原有手机号必填规则。原生 `/complete_admin/user/import/json` 将 `RegisterUserInfo.email` 交给与个人注册共用的 RegisterUser RPC，存入 `openim_v3.attribute.email` 和 `openim_v3.credential` 的邮箱登录凭据（type=2）。后台填写的邮箱可用于 99chat 邮箱密码登录；管理员创建账号不代表已完成用户收件验证。重复邮箱由原生 RPC 拒绝（20014），界面显示中文提示。
+
+`add-email.py` 对固定版本官方镜像的现有 Ant Design 表单、提交字段和重复邮箱提示作定点修改；不引入另一套页面或注册后端。修改后的入口及用户列表脚本使用新文件名，以避开 CDN 旧脚本缓存。升级官方版本时需重新核对 patch 位置。
+
+构建前可从原版镜像提取用户列表脚本，运行 `python3 test-email-patch.py <原版用户列表脚本路径>`。`email-create-e2e.mjs` 通过 ego-browser 执行，前置配置 `globalThis.adminEmailTest={spaceId,fixture,adminAccess}`；fixture 为私有 JSON，含 nickname、唯一 phoneNumber、唯一 email、password，adminAccess 为私有管理员登录文件。每次创建测试须使用新账号资料，测试会持久化一个独立用户，不发送邮件或聊天消息。
+
+2026-10-08 线上验证：真实后台表单创建独立用户成功，原生邮箱密码登录成功；换不同手机号仍不能重复邮箱创建。Mongo 中同一 userID 的邮箱资料及 type=2 登录凭据各一份，被拒绝的重复用户未产生。回滚：使用 `compose.yml.before-email-20261008` 恢复原版管理网页配置并仅重建 admin 容器；监控与 IM/Chat 服务无需变更。
 
 2026-10-06 线上验证：Nginx 检查通过，HTTPS 200；测试读取 10 个用户及 10 个群组，所有断言通过。浏览器真实表单登录后显示业务用户列表和群组列表（含已有正式数据及独立测试数据）；直接访问并刷新业务用户列表后仍返回真实用户行。管理账号 chatAdmin 的默认密码已通过原生 API 改为随机密码。
 

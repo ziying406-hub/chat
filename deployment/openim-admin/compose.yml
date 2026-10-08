@@ -1,6 +1,7 @@
 services:
   admin:
-    image: openim/openim-admin-front:release-v1.8.4-patch.2
+    image: 99chat/openim-admin-front:email
+    build: .
     container_name: openim-admin-front
     restart: unless-stopped
     volumes:
