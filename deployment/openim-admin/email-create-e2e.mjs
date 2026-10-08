@@ -36,7 +36,7 @@ async function post(url, data, token = '') {
   return response.json();
 }
 const password = createHash('md5').update(fixture.password).digest('hex');
-const login = await post('https://999.99chat99.com/chat/account/login', { email: fixture.email, password, platform: 5, autoLogin: true });
+const login = await post('https://999.99chat99.com/chat/account/login', { email: fixture.email, password: fixture.password, platform: 5, autoLogin: true });
 assert.equal(login.errCode, 0, login.errMsg);
 assert.ok(login.data.imToken && login.data.chatToken && login.data.userID);
 fixture.userID = login.data.userID;

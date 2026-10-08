@@ -30,6 +30,8 @@ JSON 包含 url、account、password。测试验证 HTTPS 页面、未登录访�
 
 创建新用户弹窗新增选填邮箱，保留原有手机号必填规则。原生 `/complete_admin/user/import/json` 将 `RegisterUserInfo.email` 交给与个人注册共用的 RegisterUser RPC，存入 `openim_v3.attribute.email` 和 `openim_v3.credential` 的邮箱登录凭据（type=2）。后台填写的邮箱可用于 99chat 邮箱密码登录；管理员创建账号不代表已完成用户收件验证。重复邮箱由原生 RPC 拒绝（20014），界面显示中文提示。
 
+后台密码采用官方 MD5 协议，99chat 页面提交原密码，两者的登录兼容修复位于 `server-patches/chat/password-login.patch`，需部署相应 Chat 镜像。2026-10-08 已用后台单个创建及批量创建的独立账号，在真实 99chat 表单输入原密码并进入聊天页；旧测试仅验证预先 MD5 的接口登录，已改为原密码测试，并补充 `browser-login-e2e.mjs` 覆盖 SDK 和页面。
+
 `add-email.py` 对固定版本官方镜像的现有 Ant Design 表单、提交字段和重复邮箱提示作定点修改；不引入另一套页面或注册后端。修改后的入口及用户列表脚本使用新文件名，以避开 CDN 旧脚本缓存。升级官方版本时需重新核对 patch 位置。
 
 构建前可从原版镜像提取用户列表脚本，运行 `python3 test-email-patch.py <原版用户列表脚本路径>`。`email-create-e2e.mjs` 通过 ego-browser 执行，前置配置 `globalThis.adminEmailTest={spaceId,fixture,adminAccess}`；fixture 为私有 JSON，含 nickname、唯一 phoneNumber、唯一 email、password，adminAccess 为私有管理员登录文件。每次创建测试须使用新账号资料，测试会持久化一个独立用户，不发送邮件或聊天消息。

@@ -1,5 +1,15 @@
 # OpenIM Chat 健康检查
 
+## 后台创建账号的密码登录
+
+`password-login.patch` 修复现有两种密码协议不一致：官方管理前端单个/批量创建用户提交 MD5 字符串，而 99chat 注册、登录、重置密码提交原始字符串。原生 RPC 原来只直接比较，导致后台账号在网页输入原密码时得到 PasswordError。
+
+校验保留原生直接比较，并允许原始输入的 MD5 与已保存的管理员账号密码匹配，不修改现有账号或密码。已有个人注册账号及官方 MD5 客户端继续使用原协议。补丁只修改登录密码校验。
+
+镜像构建包含独立 Go 测试，覆盖个人注册原始密码、管理员 MD5 密码、官方哈希输入及错误密码。`password-login-api-test.mjs` 读取私有 `ADMIN_USER_FIXTURE`、`BATCH_USER_FIXTURE`、`SIGNUP_USER_FIXTURE` JSON，验证真实原始密码登录，不再用预先 MD5 的密码替代网页操作。`deployment/openim-admin/browser-login-e2e.mjs` 通过 ego-browser，前置 `globalThis.adminBrowserLogin={spaceId,fixture,index?}`，在已退出登录的真实网页表单输入原密码，验证进入消息页、SDK 会话 userID 和通讯录导航。测试不发送聊天消息。
+
+2026-10-08 修复镜像 `99chat/openim-chat:password-login-20261008`，配置备份 `/opt/openim/docker-compose-custom.yml.before-password-login-20261008`。恢复备份后仅重建 openim-chat 可回滚，所有数据保持原样。
+
 `openim/openim-chat:v1.8.4-patch.5` 运行镜像没有 `mage`，原先的
 `mage check` 因此退出 127，即使业务 API 正常也持续显示 unhealthy。
 

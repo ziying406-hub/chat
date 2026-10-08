@@ -2,7 +2,7 @@
 // Uses independent test users and creates persistent native account records.
 import assert from 'node:assert/strict';
 import { readFile, writeFile } from 'node:fs/promises';
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 
 const config = globalThis.adminBatchTest;
 const fixture = JSON.parse(await readFile(config.fixture, 'utf8'));
@@ -38,7 +38,7 @@ for (const index of [0, 2]) {
   const row = fixture[index];
   const response = await fetch('https://999.99chat99.com/chat/account/login', {
     method: 'POST', headers: { 'Content-Type': 'application/json', operationID: randomUUID() },
-    body: JSON.stringify({ email: row.email, password: createHash('md5').update(row.password).digest('hex'), platform: 5, autoLogin: true }),
+    body: JSON.stringify({ email: row.email, password: row.password, platform: 5, autoLogin: true }),
   });
   const data = await response.json();
   assert.equal(data.errCode, 0, data.errMsg);
